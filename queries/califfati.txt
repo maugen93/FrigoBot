@@ -1,0 +1,14 @@
+select winner, cal as califfati from (
+select winner,count(*) as cal from (
+select * from (
+select *,ROW_NUMBER () OVER ( 
+        PARTITION BY week
+        ORDER BY c desc
+    ) RowNum from (
+select week,winner, count(*) as c from frigos
+group by week,winner)t
+)g
+where RowNum=1
+) p
+group by winner
+)r order by cal desc
