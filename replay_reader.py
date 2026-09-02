@@ -4,10 +4,10 @@ import requests
 
 
 def get_clean_mon_name(mon_name):
-    ALT_FORMS = """Busted|Tera|Continental|Unova|Monsoon|Sandstorm|Rainbow-Swirl|Sun|Ruby-Cream|Terastal|Hero|Four|Tundra|Droopy|River|\
-    Savanna|Archipelago|Mint-Cream|Matcha-Cream|Dada|Ocean|Modern|Original|Garden|Summer|Winter|Spring|Fall|Autumn|Ruby-Swirl|Caramel-Swirl|\
-Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Teal|Combat|Three-Segment|Johto|Lemon-Cream|Salted-Cream|Indigo|Blue|Green|Red|Orange|Yellow|Antique|Elegant|World|\
-    Three-Segment|White|Noice|Stretchy|Low-Key|Blue-Striped|Original|Resolute|HighPlains|Masterpiece|Stellar|Savanna|High Plains|\
+    ALT_FORMS = """Busted|Tera|Continental|Unova|Monsoon|Jungle|Marine|Sandstorm|Rainbow-Swirl|Sun|Ruby-Cream|Terastal|Hero|Four|Tundra|Droopy|River|\
+    Savanna|Archipelago|Icy Snow|Mint-Cream|Matcha-Cream|Dada|Ocean|Modern|Original|Garden|Summer|Winter|Spring|Fall|Autumn|Ruby-Swirl|Caramel-Swirl|\
+Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment|Johto|Lemon-Cream|Salted-Cream|Indigo|Blue|Green|Red|Orange|Yellow|Antique|Elegant|World|\
+    Three-Segment|White|Noice|Stretchy|Low-Key|Blue-Striped|Original|Resolute|HighPlains|Masterpiece|Stellar|Savanna|High Plains|Jungle|Marine\
     """
     other_animals=['Pikachu']
     s = mon_name.rstrip()
@@ -44,11 +44,14 @@ def elab_sd_replay(link_replay):
 
         log_i = log_rows[i]
 
-        # individuazione collo
+        # individuazione collo (gestisce anche la sostituzione di un
+        # giocatore a metà partita: |player|p1| svuota il nome quando il
+        # giocatore lascia, la riga successiva con un nome nuovo lo sostituisce)
         if log_i.startswith('|player|'):
             pid = log_i.split('|')[2]
-            if not players[pid]['collo']:
-                players[pid]['collo'] = log_i.split('|')[3]
+            nome = log_i.split('|')[3]
+            if nome:
+                players[pid]['collo'] = nome
 
         # individuazione animale
         if log_i.startswith('|switch|') or log_i.startswith('|drag|') or log_i.startswith('|replace|'):

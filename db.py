@@ -605,7 +605,7 @@ def getNonVincenti(conn):
 
 def getPokemonWinsPerSpawns(conn):
     query = '''select * from (
-select t1.animale as animale,spawns,wins,wins*100/spawns as wr from (
+select t1.animale as animale,spawns,wins,wins*10000/spawns as wr from (
 select spawn as animale,count(*)spawns  from (
     select distinct frigo,spawn from spawns)s
     group by spawn)t1
@@ -646,3 +646,30 @@ def getUniciVincentiInWeek(conn, week):
         cessi.append(r[0])
         sverginatori.append((r[1]))
     return cessi,sverginatori
+
+
+def getWeekInfo(conn,week):
+    cur = conn.cursor()
+    cur.execute("select startdate,enddate from weeks where week= ?",
+                (week,))
+
+    result = cur.fetchone()
+
+    if result:
+        return result[0],result[1] #startdate,enddate
+    else:
+        return None,None
+
+
+def getSinceHowManyFrigosSpawn(conn, pokemon):
+    query = '''select (select max(progr) from frigos)-(select max(frigo)from spawns
+        where spawn=?)'''
+
+
+    cur = conn.cursor()
+    cur.execute(query, (pokemon,))
+    result = cur.fetchone()
+
+    if result:
+        return result[0]
+    return 10000

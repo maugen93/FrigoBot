@@ -67,16 +67,26 @@ def rank_all(db_path):
 
 
 def rank_season(db_path):
+    # return 'Ma che siso e siso, le frigo sono morte'
     c = db.openDbConn(db_path)
-    players, wins, partecipate = db.getPlayerLeaderboard(c, from_frigo=860)
-    message = 'Classifica Fall Siso\n\n'
+    players, wins, partecipate = db.getPlayerLeaderboard(c, from_frigo=1844, to_frigo=None)
+    message = 'Classifica DefinizioneScientifica Siso\n\n'
 
+    players_dict_arr=[]
     for i in range(len(players)):
-        message = message + "{}) {:<10} {}  [{}]\n".format(i + 1, players[i], wins[i], partecipate[i])
+        player_dict={'player':players[i],'wins':wins[i],'part':partecipate[i],
+                     '5-1':(wins[i] * 5 - (partecipate[i] -wins[i]))
+                     }
+        players_dict_arr.append(player_dict)
+    ordinati = sorted(players_dict_arr, key=lambda x: x["5-1"], reverse=True)
+    for i in range(len(ordinati)):
+        message = message + "{}) {:<10} {}  [{}/{}]\n".format(i + 1, ordinati[i]['player'], ordinati[i]['5-1'],
+                                                              ordinati[i]['wins'], ordinati[i]['part'])
 
     message = message + '\nF counter: {}\n'.format(sum(wins))
-    message = message + "Started: 23/09\n"
-    message = message + "Will end: 22/12"
+    message = message + "Metodo Calcolo: 5-1\n"
+    message = message + "Started: 01/07/2026\n"
+    message = message + "Will end: 30/09/2026"
     db.closeDbConn(c)
     return message
 
@@ -168,16 +178,21 @@ def wins_animale(animale, path):
 
     winners, wins = db.getWinsPkmn(conn, top_similar)
 
+    n_last_spawn=db.getSinceHowManyFrigosSpawn(conn, top_similar)
+
+    spawn_message='\n\nApparso letteralmente nell\'ultima frigo giocata' if n_last_spawn==0 else '\n\nNon si vede in giro da {} frigo'.format(n_last_spawn)
+
     spawns_count, wins_count = db.getSpawnsWithWinsOfPokemon(conn, top_similar)
     if len(wins) == 0:
         return 'Sto cesso di {} non ha mai vinto una sebbene sia spawnato in almeno {} frigo'.format(top_similar,
-                                                                                                     spawns_count)
+                                                                                                     spawns_count)+spawn_message
 
     message = "Vittorie di {}: {}\n\n".format(top_similar, sum(wins))
     for w in range(len(winners)):
         message = message + "{} con {}\n".format(wins[w], winners[w])
 
     message = message + '\nSu {} spawn registrati ha vinto {} volte'.format(spawns_count, wins_count)
+    message =message +spawn_message
     db.closeDbConn(conn)
     return message
 
@@ -202,6 +217,7 @@ def playerCard(player, db_path):
     winsWhenPlayed = len([j for j in winners_whenPlayed if j == top_similar])
     winrate_perc = (winsWhenPlayed / len(winners_whenPlayed)) * 100 if len(winners_whenPlayed) > 0 else 0
     marvWr = logics.calcMarvWr(len(winners_whenPlayed), winsWhenPlayed, db.getNumberOfFrigos(conn, from_reg=True))
+    animali_unici, wins_unici = db.getUnicumByPlayer(conn, top_similar)
 
     message = top_similar + '\n\n'
     message = message + 'Frigo vinte overall {}\n'.format(num_wins)
@@ -215,19 +231,19 @@ def playerCard(player, db_path):
 
     message = message + '\n\nDistinto al {0:.2f}%'.format(num_distinct_pk * 100 / num_wins)
     message = message + ' con {} distinti animali\n'.format(num_distinct_pk)
-
+    message = message +'Animali Unici: {}\n'.format( len(animali_unici))
     pk, cnts = db.getMostPokeWinnerByPlayer(conn, top_similar)
     db.closeDbConn(conn)
 
     cnt_i = cnts[0]
-    message = message + "Amici Vincenti:\n[{}]: ".format(cnt_i)
+    message = message + "Amici Vincenti:\n\t\t[{}]: ".format(cnt_i)
 
     for i in range(len(pk)):
         if i < 10:
             if cnts[i] < cnt_i:
                 cnt_i = cnts[i]
                 message = message[:-1]
-                message = message + "\n[{}]: ".format(cnt_i)
+                message = message + "\n\t\t[{}]: ".format(cnt_i)
                 message = message + "{}, ".format(pk[i])
             else:
                 message = message + "{}, ".format(pk[i])
@@ -297,6 +313,11 @@ def closeWeek(db_path):
     conn = db.openDbConn(db_path)
     data_today = datetime.now().strftime('%d/%m/%y')
     actual_w = db.getActualWeek(conn)
+    dt_start_actual_week,x=db.getWeekInfo(conn,actual_w)
+
+    # durata week in giorni
+    durata_giorni = days_difference = (datetime.now() - datetime.strptime(dt_start_actual_week, "%d/%m/%y")).days
+
 
     db.closeweek(conn, actual_w, data_today)
 
@@ -338,7 +359,7 @@ def closeWeek(db_path):
         i_tot = players_tot.index(players[i])
         score_old = logics.calcMarvWr(partecipate_tot[i_tot] - partecipate[i], vinte_tot[i_tot] - vinte[i],
                                       sum(vinte_tot) - sum(vinte))
-        score_now = logics.calcMarvWr(partecipate_tot[i], vinte_tot[i], sum(vinte_tot))
+        score_now = logics.calcMarvWr(partecipate_tot[i_tot], vinte_tot[i_tot], sum(vinte_tot))
         score_diff = score_now - score_old
         if score_diff > max_increment:
             max_increment = score_diff
@@ -362,19 +383,23 @@ def closeWeek(db_path):
     else:
         message = message + '🔞Nessun cesso è stato sverginato\n\n'
 
-    message = message + '🧊Si è frigato per un ammontare complessivo di {} frigo\n'.format(sum(vinte))
+    message = message + '🧊La settimana è durata {} giorni e si è frigato per un ammontare complessivo di {} frigo, '.format(durata_giorni,sum(vinte))
+    f_per_day=sum(vinte)/durata_giorni
+    message = message + 'per una media {} '.format(joks.commentoMedia(f_per_day))
+    message = message + 'di {0:.2f} frigo al giorno\n\n'.format(f_per_day)
     w, f = db.getNumberOfFrigoPerWeek(conn)
-    if (f[-1] - f[-2]) >= 0:
-        differenziale = '+{}'.format(f[-1] - f[-2])
-    else:
-        differenziale = '{}'.format(f[-1] - f[-2])
-    message = message + '📊{} f rispetto a settimana {}\n'.format(differenziale, w[-2])
-    if (f[-1] - int(statistics.mean(f[-11:-1]))) >= 0:
-        differenziale = '+{}'.format(f[-1] - int(statistics.mean(f[-11:-1])))
-    else:
-        differenziale = '{}'.format(f[-1] - int(statistics.mean(f[-11:-1])))
 
-    message = message + '📊{} f rispetto alla media delle ultime 10 week\n'.format(differenziale)
+    start_date_week_prec,end_date_week_prec=db.getWeekInfo(conn,actual_w-1)
+    durata_giorni_week_prec =  (datetime.strptime(end_date_week_prec, "%d/%m/%y") - datetime.strptime(start_date_week_prec, "%d/%m/%y")).days
+    p_week_prec, vinte_week_prec, part_week_prec = db.getPlayerLeaderboard(conn, week=actual_w-1)
+    f_per_day_prec = sum(vinte_week_prec) / durata_giorni_week_prec
+
+    differenziale = (f_per_day - f_per_day_prec)
+    if differenziale>=0:
+        message = message + '📊+{0:.2f} frigo al giorno '.format(differenziale)
+    else:
+        message = message + '📊{0:.2f} frigo al giorno '.format(differenziale)
+    message = message + 'rispetto a settimana {}\n\n'.format(w[-2])
     message = message + '🏃‍♂️‍➡️Maggior contribuente: {} ({})'.format(players[partecipate.index(max(partecipate))],
                                                                       max(partecipate))
 
@@ -422,6 +447,14 @@ def UniciPlayer(player, db_path):
 def ListOfCessi(db_path):
     c = db.openDbConn(db_path)
     cess = db.getNonVincenti(c)
+
+    #manual fix
+    #cess.remove('Magearna-Original-Mega')
+    #cess.remove('Vivillon-Jungle')
+    #cess.remove('Vivillon-Marine')
+    #cess.remove('Morpeko-Hangry')
+    #end manual fix
+
     message = 'Animali che non hanno mai vinto una frigo\nTotale: {}\n\n'.format(len(cess))
     message = message + str(cess).replace("'", "").replace('[', '').replace(']', '')
     db.closeDbConn(c)

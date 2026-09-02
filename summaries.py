@@ -22,7 +22,7 @@ def elabSummeries(db_path, from_f, to_f):
     new_f['Winrate_Pond']=((new_f['Vinte']*np.log(new_f['Giocate'])/new_f['Giocate'])*1000).astype(int)
     new_f['Punteggio4-1']=new_f['Vinte']*4-(new_f['Giocate']-new_f['Vinte'])
     new_f['Punteggio5-1'] = new_f['Vinte'] * 5 - (new_f['Giocate'] - new_f['Vinte'])
-    new_f.to_csv(r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\stats_summer.csv',sep=';',decimal=',')
+    new_f.to_csv(r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\stats_tashino.csv',sep=';',decimal=',')
     print(new_f)
     db.closeDbConn(c)
 
@@ -108,7 +108,7 @@ def AllWinsPerPokemonStats(db_path,pdf_path):
 
 
     print(dict)
-#elabSummeries( r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\frigo.db',360,860)
+elabSummeries( r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\frigo.db',1687,1843)
 #AllPokeWinnersByPlayers( r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\frigo.db',
 #                          r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\elenco_pokemons.pdf')
 AllWinsPerPokemonStats( r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\frigo.db',

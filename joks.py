@@ -42,3 +42,14 @@ def str_sverg(sverginatori):
 
     # Restituisci la stringa con il numero di occorrenze tra parentesi
     return f"{stringa_elementi} ({occorrenza_massima})"
+
+def commentoMedia(f_per_day):
+    if f_per_day<1:
+        return 'francamente sconfortante'
+    if f_per_day<2:
+        return 'miserabile'
+    if f_per_day<3:
+        return 'in fin dei conti accettabile'
+    if f_per_day<5:
+        return 'niente male'
+    return 'fuori di testa'
