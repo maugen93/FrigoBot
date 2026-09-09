@@ -673,3 +673,21 @@ def getSinceHowManyFrigosSpawn(conn, pokemon):
     if result:
         return result[0]
     return 10000
+
+
+def getMonsMissingTheLongest(conn, limit=10):
+    query = '''select spawn, (select max(progr) from frigos) - max(frigo) as since
+        from spawns
+        group by spawn
+        order by since desc
+        limit ?'''
+
+    mons = []
+    since = []
+    cur = conn.cursor()
+    cur.execute(query, (limit,))
+    result = cur.fetchall()
+    for r in result:
+        mons.append(r[0])
+        since.append(r[1])
+    return mons, since
