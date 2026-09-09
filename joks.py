@@ -7,8 +7,8 @@ def messForWinnerOnReg(winner_name, pk_winner):
         'marviglio': 'Concessa al solito ({})'.format(pk_winner),
         'bot': 'Parterre talmente scarso che vince il bot con {}'.format(pk_winner),
         'ilfato': 'Ma è possibile essere così impediti da far vincere ciccio giunta con {}'.format(pk_winner),
-        'defava':'Defava defava e viene anche premiato...BOH ({})'.format(pk_winner),
-        'spte':'Vabbe solo spites poteva vincere con {}'.format(pk_winner)
+        'fraga':'Zitto zitto arriva raga con {}'.format(pk_winner),
+        'spite':'Vabbe solo spites poteva vincere con {}'.format(pk_winner)
     }
     defaults = ['Vince {} con {}, giocando completamente a caso'.format(winner_name, pk_winner),
                 'Totalmente concessa a {} con {}'.format(winner_name, pk_winner),

@@ -236,6 +236,13 @@ async def animali2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, p
     return
 
 
+async def desaparecidos_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.desaparecidos(path), reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 def start_bot(token, db_path):
     application = Application.builder().token(token).build()
 
@@ -273,6 +280,8 @@ def start_bot(token, db_path):
 
     c_animali2 = CommandHandler("animali2", partial(animali2_command, path=db_path))
 
+    c_desaparecidos = CommandHandler("desaparecidos", partial(desaparecidos_command, path=db_path))
+
     application.add_handler(m)
     application.add_handler(c_week)
     application.add_handler(c_animali)
@@ -294,6 +303,7 @@ def start_bot(token, db_path):
     application.add_handler(c_uni_pl)
     application.add_handler(c_cessi)
     application.add_handler(c_animali2)
+    application.add_handler(c_desaparecidos)
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

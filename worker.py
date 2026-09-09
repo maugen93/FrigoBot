@@ -475,6 +475,18 @@ def WinrateAnimali(db_path):
     return message
 
 
+def desaparecidos(db_path, limit=10):
+    c = db.openDbConn(db_path)
+    mons, since = db.getMonsMissingTheLongest(c, limit)
+    db.closeDbConn(c)
+
+    message = 'Animali scomparsi da piu tempo\n'
+    for i in range(len(mons)):
+        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else 'non si vede da {} frigo'.format(since[i])
+        message = message + "\n{}) {} : {}".format(i + 1, mons[i], spawn_message)
+    return message
+
+
 def calippi(db_path):
     c = db.openDbConn(db_path)
     califfi = db.getCaliffi(c)
