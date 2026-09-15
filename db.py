@@ -312,6 +312,23 @@ def getPlayerInfo(conn, player):
     return num_wins, winners_whenPlayed
 
 
+def getWeeklyGamesAndWinsByPlayer(conn, player):
+    cur = conn.cursor()
+    query = '''select week,
+        count(*) as games,
+        sum(case when winner=? then 1 else 0 end) as wins
+    from frigos
+    where player1=? or player2=? or player3=? or player4=?
+    group by week'''
+    result = cur.execute(query, (player, player, player, player, player,))
+    games = []
+    wins = []
+    for r in result:
+        games.append(r[1])
+        wins.append(r[2])
+    return games, wins
+
+
 def getMostPokeWinnerByPlayer(conn, player):
     pks = []
     cnts = []

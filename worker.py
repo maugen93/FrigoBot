@@ -218,6 +218,8 @@ def playerCard(player, db_path):
     winrate_perc = (winsWhenPlayed / len(winners_whenPlayed)) * 100 if len(winners_whenPlayed) > 0 else 0
     marvWr = logics.calcMarvWr(len(winners_whenPlayed), winsWhenPlayed, db.getNumberOfFrigos(conn, from_reg=True))
     animali_unici, wins_unici = db.getUnicumByPlayer(conn, top_similar)
+    weekly_games, weekly_wins = db.getWeeklyGamesAndWinsByPlayer(conn, top_similar)
+    winrate_variability = logics.calcWinrateVariability(weekly_games, weekly_wins)
 
     message = top_similar + '\n\n'
     message = message + 'Frigo vinte overall {}\n'.format(num_wins)
@@ -229,7 +231,14 @@ def playerCard(player, db_path):
 
     message = message + 'MarvWr Score: {} '.format(marvWr)
 
-    message = message + '\n\nDistinto al {0:.2f}%'.format(num_distinct_pk * 100 / num_wins)
+    if winrate_variability is None:
+        message = message + '\n SwingScore: n/d (dati non sufizienti)\n'
+    else:
+        message = message + '\n SwingScore: {} (WR settimanale {:.1f}% ± {:.1f})\n'.format(
+            winrate_variability['score'], winrate_variability['mean_wr'], winrate_variability['true_stdev']
+        )
+
+    message = message + '\nDistinto al {0:.2f}%'.format(num_distinct_pk * 100 / num_wins)
     message = message + ' con {} distinti animali\n'.format(num_distinct_pk)
     message = message +'Animali Unici: {}\n'.format( len(animali_unici))
     pk, cnts = db.getMostPokeWinnerByPlayer(conn, top_similar)
@@ -480,9 +489,9 @@ def desaparecidos(db_path, limit=10):
     mons, since = db.getMonsMissingTheLongest(c, limit)
     db.closeDbConn(c)
 
-    message = 'Animali scomparsi da piu tempo\n'
+    message = 'Animali scomparsi da più tempo\n'
     for i in range(len(mons)):
-        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else 'non si vede da {} frigo'.format(since[i])
+        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else '{}'.format(since[i])
         message = message + "\n{}) {} : {}".format(i + 1, mons[i], spawn_message)
     return message
 
