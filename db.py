@@ -19,10 +19,38 @@ def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link):
     conn.commit()
 
 
-def insertSpawn(conn, f_nr, player, spawn):
-    conn.execute("INSERT INTO spawns (frigo,player,spawn) VALUES (?,?,?)",
-                 (f_nr, player, spawn))
+def insertSpawn(conn, f_nr, player, spawn, winconato=False):
+    conn.execute("INSERT INTO spawns (frigo,player,spawn,winconato) VALUES (?,?,?,?)",
+                 (f_nr, player, spawn, int(winconato)))
     conn.commit()
+
+
+def setWinconato(conn, f_nr, player, spawn):
+    cur = conn.execute("UPDATE spawns SET winconato=1 WHERE frigo=? AND player=? AND spawn=?",
+                        (f_nr, player, spawn))
+    conn.commit()
+    return cur.rowcount
+
+
+def getFrigosToBackfillWinconato(conn, frigo_nrs=None):
+    cur = conn.cursor()
+    if frigo_nrs:
+        placeholders = ','.join('?' * len(frigo_nrs))
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE progr IN ({}) AND replay_link IS NOT NULL ORDER BY progr".format(placeholders),
+            frigo_nrs
+        )
+    else:
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE replay_link IS NOT NULL "
+            "AND progr NOT IN (SELECT DISTINCT frigo FROM spawns WHERE winconato = 1) "
+            "ORDER BY progr"
+        )
+    result = cur.fetchall()
+    cur.close()
+    return result
 
 
 def isSDReplayAlreadyLoaded(conn, sd_link):
@@ -708,3 +736,64 @@ def getMonsMissingTheLongest(conn, limit=10):
         mons.append(r[0])
         since.append(r[1])
     return mons, since
+
+
+def getCessiWinconByPlayer(conn, player):
+    '''Un "cesso" è un animale che, al momento in cui è stato usato come ultimo
+    pokemon (wincon, colonna spawns.winconato) da un giocatore in una frigo, non
+    aveva ancora mai vinto una frigo (indipendentemente da chi l'avesse usato).
+    Restituisce (tentativi, vittorie): quante volte il giocatore ha tentato la
+    wincon con un cesso e quante di quelle volte ha effettivamente sverginato
+    quell'animale.'''
+    query = '''
+    WITH wincon AS (
+        SELECT s.frigo, s.player, s.spawn AS last_mon, f.progr, f.winner, f.pokewinner
+        FROM spawns s
+        INNER JOIN frigos f ON f.progr = s.frigo
+        WHERE s.winconato = 1 AND s.player = ?
+    )
+    SELECT
+        SUM(CASE WHEN NOT EXISTS (
+            SELECT 1 FROM frigos f2
+            WHERE f2.pokewinner = wincon.last_mon AND f2.progr < wincon.progr
+        ) THEN 1 ELSE 0 END) AS tentativi,
+        SUM(CASE WHEN NOT EXISTS (
+            SELECT 1 FROM frigos f2
+            WHERE f2.pokewinner = wincon.last_mon AND f2.progr < wincon.progr
+        ) AND wincon.winner = wincon.player AND wincon.pokewinner = wincon.last_mon
+        THEN 1 ELSE 0 END) AS vinte
+    FROM wincon
+    '''
+    cur = conn.cursor()
+    cur.execute(query, (player,))
+    result = cur.fetchone()
+    if not result or result[0] is None:
+        return 0, 0
+    return result[0], result[1]
+
+
+def getCessiSpawnsByPlayer(conn, player):
+    '''In quante frigo giocate il giocatore ha avuto in squadra almeno un "cesso"
+    (un animale che, al momento dello spawn, non aveva ancora mai vinto una frigo),
+    indipendentemente dal fatto che sia stato poi usato come wincon (spawns.winconato).
+    Conta le frigo, non i singoli spawn: più cessi nella stessa frigo contano una volta sola.'''
+    query = '''
+    WITH player_spawns AS (
+        SELECT s.frigo, s.spawn AS mon, f.progr
+        FROM spawns s
+        INNER JOIN frigos f ON f.progr = s.frigo
+        WHERE s.player = ?
+    )
+    SELECT COUNT(DISTINCT ps.frigo)
+    FROM player_spawns ps
+    WHERE NOT EXISTS (
+        SELECT 1 FROM frigos f2
+        WHERE f2.pokewinner = ps.mon AND f2.progr < ps.progr
+    )
+    '''
+    cur = conn.cursor()
+    cur.execute(query, (player,))
+    result = cur.fetchone()
+    if not result or result[0] is None:
+        return 0
+    return result[0]

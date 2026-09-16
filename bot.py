@@ -11,12 +11,13 @@ import time
 
 import worker
 
+SUPER_USERS = [170532946]
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = worker.insertResult(path, update.message.text)
     if message:
         await update.message.reply_text(
-            message, reply_markup=ReplyKeyboardRemove()
+            message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
     time.sleep(5)
     await context.bot.send_message(update.message.chat_id, 'prossima')
@@ -25,35 +26,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
 
 async def global_rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.rank_all(path), reply_markup=ReplyKeyboardRemove()
+        worker.rank_all(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.rank_week(path), reply_markup=ReplyKeyboardRemove()
+        worker.rank_week(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def animali_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.rank_pkmn(path), reply_markup=ReplyKeyboardRemove()
+        worker.rank_pkmn(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def season_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.rank_season(path), reply_markup=ReplyKeyboardRemove()
+        worker.rank_season(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def score_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.global_score(path), reply_markup=ReplyKeyboardRemove()
+        worker.global_score(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -61,9 +62,9 @@ async def score_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path
 async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     user = update.message.from_user
-    if user.id != 170532946:
+    if user.id not in SUPER_USERS:
         await update.message.reply_text(
-            'Ti piacerebbe, porco', reply_markup=ReplyKeyboardRemove()
+            'Ti piacerebbe, porco', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
 
@@ -74,21 +75,21 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path
     else:
         mess = 'Ma che cazzo hai scritto, non funziona'
     await update.message.reply_text(
-        mess, reply_markup=ReplyKeyboardRemove()
+        mess, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def closeweek_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     user = update.message.from_user
-    if user.id != 170532946:
+    if user.id not in SUPER_USERS:
         await update.message.reply_text(
-            'Ti piacerebbe, porco', reply_markup=ReplyKeyboardRemove()
+            'Ti piacerebbe, porco', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
     message = worker.closeWeek(path)
     await update.message.reply_text(
-        message, reply_markup=ReplyKeyboardRemove()
+        message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -96,9 +97,9 @@ async def closeweek_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 async def tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     user = update.message.from_user
-    if user.id != 170532946:
+    if user.id not in SUPER_USERS:
         await update.message.reply_text(
-            'Ti piacerebbe, porco', reply_markup=ReplyKeyboardRemove()
+            'Ti piacerebbe, porco', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
 
@@ -106,14 +107,14 @@ async def tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
 
     if message:
         await update.message.reply_text(
-            message, reply_markup=ReplyKeyboardRemove()
+            message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
     return
 
 
 async def cal_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.calippi(path), reply_markup=ReplyKeyboardRemove()
+        worker.calippi(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -125,12 +126,12 @@ async def animale_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
         animale = command.replace("/animale ", '')
         message = worker.wins_animale(animale, path)
         await update.message.reply_text(
-            message, reply_markup=ReplyKeyboardRemove()
+            message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
     else:
         await update.message.reply_text(
-            'e dammi un animale', reply_markup=ReplyKeyboardRemove()
+            'e dammi un animale', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
 
@@ -142,12 +143,12 @@ async def player_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
         player = command.replace("/player ", '')
         message = worker.playerCard(player, path)
         await update.message.reply_text(
-            message, reply_markup=ReplyKeyboardRemove()
+            message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
     else:
         await update.message.reply_text(
-            'e dimmi chi', reply_markup=ReplyKeyboardRemove()
+            'e dimmi chi', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
 
@@ -159,12 +160,12 @@ async def secchezza_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         player = command.replace("/secchezza ", '')
         message = worker.secchezza(player, path)
         await update.message.reply_text(
-            message, reply_markup=ReplyKeyboardRemove()
+            message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
     else:
         await update.message.reply_text(
-            'e dimmi chi', reply_markup=ReplyKeyboardRemove()
+            'e dimmi chi', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
 
@@ -173,7 +174,7 @@ async def andazzo_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
     plot_path = worker.frigoFrequency(path)
 
     await update.message.reply_photo(
-        plot_path, caption='Numero di Frigo fatte per week', reply_markup=ReplyKeyboardRemove()
+        plot_path, caption='Numero di Frigo fatte per week', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -182,25 +183,25 @@ async def ladder_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
     # tab_path = worker.Ladder(path)
 
     # await update.message.reply_photo(
-    #    tab_path,caption='Ladder', reply_markup=ReplyKeyboardRemove()
+    #    tab_path,caption='Ladder', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     # )
     # return
     await update.message.reply_text(
-        'fottiti', reply_markup=ReplyKeyboardRemove()
+        'fottiti', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def send_link_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        'https://calc.pokemonshowdown.com/randoms.html?mode=randoms', reply_markup=ReplyKeyboardRemove()
+        'https://calc.pokemonshowdown.com/randoms.html?mode=randoms', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def unicum_ladder_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.LadderUnici(path), reply_markup=ReplyKeyboardRemove()
+        worker.LadderUnici(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -212,40 +213,54 @@ async def unicum_player_command(update: Update, context: ContextTypes.DEFAULT_TY
         player = command.replace("/unicum ", '')
         message = worker.UniciPlayer(player, path)
         await update.message.reply_text(
-            message, reply_markup=ReplyKeyboardRemove()
+            message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
     else:
         await update.message.reply_text(
-            'e dimmi chi', reply_markup=ReplyKeyboardRemove()
+            'e dimmi chi', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
         )
         return
 
 
 async def cessi_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.ListOfCessi(path), reply_markup=ReplyKeyboardRemove()
+        worker.ListOfCessi(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def animali2_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.WinrateAnimali(path), reply_markup=ReplyKeyboardRemove()
+        worker.WinrateAnimali(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def desaparecidos_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.desaparecidos(path), reply_markup=ReplyKeyboardRemove()
+        worker.desaparecidos(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
 
 async def swingers_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
-        worker.swingRanking(path), reply_markup=ReplyKeyboardRemove()
+        worker.swingRanking(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
+async def svergiconverters_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.svergiconvertersRanking(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
+async def svergitryers_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.svergitryersRanking(path), parse_mode='Markdown', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -291,6 +306,9 @@ def start_bot(token, db_path):
 
     c_swingers = CommandHandler("swingers", partial(swingers_command, path=db_path))
 
+    c_svergiconverters = CommandHandler("svergiconverters", partial(svergiconverters_command, path=db_path))
+    c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
+
     application.add_handler(m)
     application.add_handler(c_week)
     application.add_handler(c_animali)
@@ -314,6 +332,8 @@ def start_bot(token, db_path):
     application.add_handler(c_animali2)
     application.add_handler(c_desaparecidos)
     application.add_handler(c_swingers)
+    application.add_handler(c_svergiconverters)
+    application.add_handler(c_svergitryers)
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
