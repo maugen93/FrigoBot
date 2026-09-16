@@ -161,6 +161,27 @@ def global_score(path):
     return message
 
 
+def swingRanking(db_path):
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    results = []
+    for p in players:
+        weekly_games, weekly_wins = db.getWeeklyGamesAndWinsByPlayer(conn, p)
+        swing = logics.calcWinrateVariability(weekly_games, weekly_wins)
+        if swing is not None:
+            results.append((p, swing))
+    db.closeDbConn(conn)
+
+    results.sort(key=lambda x: x[1]['score'], reverse=True)
+
+    message = 'SwingScore Ranking\n\n'
+    for i, (player, swing) in enumerate(results):
+        message = message + "{}) {:<10} {}  (WR stimato {:.1f}% ± {:.1f})\n".format(
+            i + 1, player, swing['score'], swing['mean_wr'], swing['true_stdev']
+        )
+    return message
+
+
 def wins_animale(animale, path):
     conn = db.openDbConn(path)
     mons = db.getAllMons(conn)
@@ -197,6 +218,25 @@ def wins_animale(animale, path):
     return message
 
 
+def _ordinal(n):
+    if 10 <= n % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return '{}{}'.format(n, suffix)
+
+
+def _formatRank(value, all_values):
+    better = sum(1 for v in all_values if v > value)
+    rank = better + 1
+    tied = sum(1 for v in all_values if v == value) > 1
+    label = _ordinal(rank)
+    if tied:
+        label = 't-{}'.format(label)
+    medal = {1: '🥇 ', 2: '🥈 ', 3: '🥉 '}.get(rank, '') if not tied else ''
+    return ' [{}{}]'.format(medal, label)
+
+
 def playerCard(player, db_path):
     conn = db.openDbConn(db_path)
     players = db.getAllPlayers(conn)
@@ -212,35 +252,67 @@ def playerCard(player, db_path):
         db.closeDbConn(conn)
         return "non conosco questo {}".format(player)
 
-    num_wins, winners_whenPlayed = db.getPlayerInfo(conn, top_similar)
+    total_frigos_from_reg = db.getNumberOfFrigos(conn, from_reg=True)
+
+    all_wins = []
+    all_winrates = []
+    all_marvwr = []
+    all_swing = []
+    all_animali_unici = []
+
+    num_wins = winners_whenPlayed = winsWhenPlayed = winrate_perc = None
+    marvWr = animali_unici = winrate_variability = None
+
+    for p in players:
+        p_num_wins, p_winners_whenPlayed = db.getPlayerInfo(conn, p)
+        p_winsWhenPlayed = len([j for j in p_winners_whenPlayed if j == p])
+        p_winrate = (p_winsWhenPlayed / len(p_winners_whenPlayed)) * 100 if len(p_winners_whenPlayed) > 0 else 0
+        p_marvwr = logics.calcMarvWr(len(p_winners_whenPlayed), p_winsWhenPlayed, total_frigos_from_reg)
+        p_animali_unici, _ = db.getUnicumByPlayer(conn, p)
+        p_weekly_games, p_weekly_wins = db.getWeeklyGamesAndWinsByPlayer(conn, p)
+        p_swing = logics.calcWinrateVariability(p_weekly_games, p_weekly_wins)
+
+        all_wins.append(p_num_wins)
+        all_winrates.append(p_winrate)
+        all_marvwr.append(p_marvwr)
+        all_animali_unici.append(len(p_animali_unici))
+        if p_swing is not None:
+            all_swing.append(p_swing['score'])
+
+        if p == top_similar:
+            num_wins = p_num_wins
+            winners_whenPlayed = p_winners_whenPlayed
+            winsWhenPlayed = p_winsWhenPlayed
+            winrate_perc = p_winrate
+            marvWr = p_marvwr
+            animali_unici = p_animali_unici
+            winrate_variability = p_swing
+
     num_distinct_pk = db.getDistinctPokeByPlayer(conn, top_similar)
-    winsWhenPlayed = len([j for j in winners_whenPlayed if j == top_similar])
-    winrate_perc = (winsWhenPlayed / len(winners_whenPlayed)) * 100 if len(winners_whenPlayed) > 0 else 0
-    marvWr = logics.calcMarvWr(len(winners_whenPlayed), winsWhenPlayed, db.getNumberOfFrigos(conn, from_reg=True))
-    animali_unici, wins_unici = db.getUnicumByPlayer(conn, top_similar)
-    weekly_games, weekly_wins = db.getWeeklyGamesAndWinsByPlayer(conn, top_similar)
-    winrate_variability = logics.calcWinrateVariability(weekly_games, weekly_wins)
 
     message = top_similar + '\n\n'
-    message = message + 'Frigo vinte overall {}\n'.format(num_wins)
-    message = message + 'Winrate {0:.2f}% '.format(winrate_perc)
+    message = message + 'Frigo vinte overall {}{}\n'.format(num_wins, _formatRank(num_wins, all_wins))
+    message = message + 'Winrate {0:.2f}%{1} '.format(winrate_perc, _formatRank(winrate_perc, all_winrates))
 
     message = message + '({} vinte su {} giocate su {} registrate)\n'.format(
         winsWhenPlayed, len(winners_whenPlayed), db.getNumFrigoWithPlayersSpecified(conn)
     )
 
-    message = message + 'MarvWr Score: {} '.format(marvWr)
+    message = message + 'MarvWr Score: {}{} '.format(marvWr, _formatRank(marvWr, all_marvwr))
 
     if winrate_variability is None:
-        message = message + '\n SwingScore: n/d (dati non sufizienti)\n'
+        message = message + '\n→ SwingScore: n/d (dati non sufizienti)\n'
     else:
-        message = message + '\n SwingScore: {} (WR settimanale {:.1f}% ± {:.1f})\n'.format(
-            winrate_variability['score'], winrate_variability['mean_wr'], winrate_variability['true_stdev']
+        message = message + '\n→ SwingScore: {}{} (WR stimato {:.1f}% ± {:.1f})\n'.format(
+            winrate_variability['score'], _formatRank(winrate_variability['score'], all_swing),
+            winrate_variability['mean_wr'], winrate_variability['true_stdev']
         )
 
-    message = message + '\nDistinto al {0:.2f}%'.format(num_distinct_pk * 100 / num_wins)
+    message = message + '\nDistinto al {0:.1f}%'.format(num_distinct_pk * 100 / num_wins)
     message = message + ' con {} distinti animali\n'.format(num_distinct_pk)
-    message = message +'Animali Unici: {}\n'.format( len(animali_unici))
+    message = message + 'Animali Unici: {}{}\n'.format(
+        len(animali_unici), _formatRank(len(animali_unici), all_animali_unici)
+    )
     pk, cnts = db.getMostPokeWinnerByPlayer(conn, top_similar)
     db.closeDbConn(conn)
 
@@ -251,7 +323,7 @@ def playerCard(player, db_path):
         if i < 10:
             if cnts[i] < cnt_i:
                 cnt_i = cnts[i]
-                message = message[:-1]
+                message = message[:-2]
                 message = message + "\n\t\t[{}]: ".format(cnt_i)
                 message = message + "{}, ".format(pk[i])
             else:

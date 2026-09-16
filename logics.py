@@ -30,8 +30,19 @@ def calcWinrateVariability(weekly_games, weekly_wins, min_games_per_week=2,
     (il tetto di "variabilità assurdamente alta ma raggiungibile" per questo gioco) e viene usata
     per normalizzare lo score risultante su una scala 0-100.
 
+    Il rumore campionario atteso (expected_var) tende a essere sistematicamente più alto della
+    varianza osservata tra week (observed_var): con pochi game a settimana e un winrate atteso
+    basso (~25%, FFA a 4), la formula binomiale p(1-p)/n sovrastima il rumore reale (gli avversari
+    cambiano di partita in partita, quindi il p reale non è fisso come assume il modello binomiale
+    i.i.d.). Sottrarre semplicemente expected_var da observed_var e clampare a 0 (max(0, ...))
+    azzererebbe true_stdev per la maggioranza dei giocatori. Per evitarlo, la varianza osservata
+    viene invece "ridotta" (shrinkage) in proporzione al rapporto observed_var/expected_var, senza
+    mai azzerarsi del tutto: un rapporto vicino a 0 (variabilità quasi tutta rumore) dà uno
+    shrinkage vicino a 0, un rapporto alto (variabilità vera, oltre al rumore) dà uno shrinkage
+    vicino a 1.
+
     Ritorna un dict con 'mean_wr' (winrate medio pesato), 'true_stdev' (deviazione standard del
-    winrate nettata dal rumore) e 'score' (0-100, 0 = winrate stabile, 100 = variabilità estrema),
+    winrate scalata dal rumore) e 'score' (0-100, 0 = winrate stabile, 100 = variabilità estrema),
     oppure None se non ci sono almeno 2 week con dati sufficienti.
     """
     pairs = [
@@ -64,6 +75,8 @@ def calcWinrateVariability(weekly_games, weekly_wins, min_games_per_week=2,
         expected_var += weight * sampling_var
     expected_var /= total_weight
 
-    true_stdev = math.sqrt(max(0.0, observed_var - expected_var))
+    ratio = observed_var / expected_var if expected_var > 0 else 0.0
+    shrinkage = ratio / (ratio + 1)
+    true_stdev = math.sqrt(observed_var) * shrinkage
     score = min(100, round(true_stdev / max_reasonable_stdev * 100))
     return {'mean_wr': mean, 'true_stdev': true_stdev, 'score': score}

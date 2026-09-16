@@ -243,6 +243,13 @@ async def desaparecidos_command(update: Update, context: ContextTypes.DEFAULT_TY
     return
 
 
+async def swingers_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.swingRanking(path), reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 def start_bot(token, db_path):
     application = Application.builder().token(token).build()
 
@@ -282,6 +289,8 @@ def start_bot(token, db_path):
 
     c_desaparecidos = CommandHandler("desaparecidos", partial(desaparecidos_command, path=db_path))
 
+    c_swingers = CommandHandler("swingers", partial(swingers_command, path=db_path))
+
     application.add_handler(m)
     application.add_handler(c_week)
     application.add_handler(c_animali)
@@ -304,6 +313,7 @@ def start_bot(token, db_path):
     application.add_handler(c_cessi)
     application.add_handler(c_animali2)
     application.add_handler(c_desaparecidos)
+    application.add_handler(c_swingers)
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
