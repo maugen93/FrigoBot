@@ -839,12 +839,16 @@ def getWinconCountForPokemon(conn, pokemon):
 def getTopWinconedMons(conn, limit=10):
     '''I `limit` animali scelti più spesso come wincon (spawns.winconato),
     indipendentemente da chi li ha spawnati. Ritorna una lista di tuple
-    (spawn, wincon_cnt) ordinata per wincon_cnt decrescente.'''
+    (spawn, wincon_cnt, wins), dove wins e' quante di quelle volte il
+    giocatore che ha tentato la wincon ha poi effettivamente vinto la frigo.
+    Ordinata per wincon_cnt decrescente.'''
     cur = conn.cursor()
-    cur.execute('''SELECT spawn, COUNT(*) AS wincon_cnt
-        FROM spawns
-        WHERE winconato=1
-        GROUP BY spawn
+    cur.execute('''SELECT s.spawn, COUNT(*) AS wincon_cnt,
+               SUM(CASE WHEN f.winner = s.player THEN 1 ELSE 0 END) AS wins
+        FROM spawns s
+        JOIN frigos f ON f.progr = s.frigo
+        WHERE s.winconato=1
+        GROUP BY s.spawn
         ORDER BY wincon_cnt DESC
         LIMIT ?''', (limit,))
     return cur.fetchall()

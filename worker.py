@@ -669,8 +669,9 @@ def topWincons(db_path, limit=10):
     db.closeDbConn(c)
 
     message = 'Top {} animali più winconati\n'.format(limit)
-    for i, (mon, wincon_cnt) in enumerate(top):
-        message = message + "\n<code>{}</code>) {} : <code>{}</code>".format(i + 1, mon, wincon_cnt)
+    for i, (mon, wincon_cnt, wins) in enumerate(top):
+        wr = wins / wincon_cnt * 100
+        message = message + "\n<code>{}</code>) {}: <code>{}</code> (<code>{:.0f}%</code>)".format(i + 1, mon, wincon_cnt, wr)
     return message
 
 
