@@ -41,7 +41,7 @@ def str_sverg(sverginatori):
         stringa_elementi = elementi_massimi[0]
 
     # Restituisci la stringa con il numero di occorrenze tra parentesi
-    return f"{stringa_elementi} ({occorrenza_massima})"
+    return f"{stringa_elementi} (`{occorrenza_massima}`)"
 
 def commentoMedia(f_per_day):
     if f_per_day<1:

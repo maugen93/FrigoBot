@@ -33,10 +33,10 @@ def elab_sd_replay(link_replay):
     pokewinner = None
     players = data['players']
 
-    players = {'p1': {'collo': None, 'animali': []},
-               'p2': {'collo': None, 'animali': []},
-               'p3': {'collo': None, 'animali': []},
-               'p4': {'collo': None, 'animali': []}
+    players = {'p1': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
+               'p2': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
+               'p3': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
+               'p4': {'collo': None, 'animali': [], 'ultimo_in_campo': None}
                }
 
     log_rows = data['log'].split('\n')
@@ -53,13 +53,16 @@ def elab_sd_replay(link_replay):
             if nome:
                 players[pid]['collo'] = nome
 
-        # individuazione animale
+        # individuazione animale (e tracciamento dell'ultimo animale mandato in
+        # campo da ogni giocatore, per capire con chi ha tentato il wincon anche
+        # in caso di forfeit)
         if log_i.startswith('|switch|') or log_i.startswith('|drag|') or log_i.startswith('|replace|'):
             pid = log_i.split('|')[2][:2]
             animale = log_i.split('|')[3].split(',')[0]
             animale = get_clean_mon_name(animale)
             if animale not in players[pid]['animali']:
                 players[pid]['animali'].append(animale)
+            players[pid]['ultimo_in_campo'] = animale
 
         if log_i.startswith('|win|'):
             winner = log_i.split('|')[2]

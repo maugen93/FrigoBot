@@ -4,11 +4,116 @@ import pandas
 
 def openDbConn(dbpath):
     conn = sqlite3.connect(dbpath)
+    ensureStatsCacheSchema(conn)
     return conn
 
 
 def closeDbConn(conn):
     conn.close()
+
+
+def ensureStatsCacheSchema(conn):
+    '''Crea (se assenti) le tabelle di cache usate per svergiconverters/svergitryers/
+    swingscore, cosi' non serve una migrazione separata su ogni frigo.db esistente.'''
+    conn.execute('''CREATE TABLE IF NOT EXISTS mon_first_win (
+        mon TEXT PRIMARY KEY,
+        first_win_progr INTEGER NOT NULL
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS player_cesso_stats (
+        player TEXT PRIMARY KEY,
+        tentativi INTEGER NOT NULL DEFAULT 0,
+        vinte INTEGER NOT NULL DEFAULT 0,
+        cessi_spawnati INTEGER NOT NULL DEFAULT 0
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS player_weekly_stats (
+        player TEXT NOT NULL,
+        week INTEGER NOT NULL,
+        games INTEGER NOT NULL DEFAULT 0,
+        wins INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player, week)
+    )''')
+    conn.commit()
+
+
+def updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner):
+    '''Aggiorna incrementalmente mon_first_win/player_cesso_stats/player_weekly_stats
+    per una singola frigo appena inserita, cosi' svergiconverters/svergitryers/swingscore
+    non devono piu' ricalcolarsi rileggendo tutta la storia a ogni chiamata.
+
+    `participants` sono i 4 player1..player4 della frigo (sempre presenti, anche per le
+    frigo storiche caricate da CSV senza righe in spawns - usati per player_weekly_stats).
+    `spawns` e' una lista di tuple (player, mon, winconato) - la stessa informazione
+    passata a insertSpawn per ogni animale della frigo (assente per quelle frigo storiche,
+    quindi non contribuiscono a player_cesso_stats, come nella query originale che le
+    joinava tramite spawns). Va chiamata una volta per frigo, in ordine di progr crescente
+    (rebuildStatsCache si appoggia alla stessa assunzione).
+    '''
+    cur = conn.cursor()
+
+    cessi_players = set()
+    for player, mon, winconato in spawns:
+        cur.execute("SELECT 1 FROM mon_first_win WHERE mon=?", (mon,))
+        is_cesso = cur.fetchone() is None
+        if is_cesso:
+            cessi_players.add(player)
+
+        if winconato and is_cesso:
+            vinto = 1 if (winner == player and pokewinner == mon) else 0
+            cur.execute('''
+                INSERT INTO player_cesso_stats (player, tentativi, vinte, cessi_spawnati)
+                VALUES (?, 1, ?, 0)
+                ON CONFLICT(player) DO UPDATE SET
+                    tentativi = tentativi + 1,
+                    vinte = vinte + excluded.vinte
+            ''', (player, vinto))
+
+    for player in cessi_players:
+        cur.execute('''
+            INSERT INTO player_cesso_stats (player, tentativi, vinte, cessi_spawnati)
+            VALUES (?, 0, 0, 1)
+            ON CONFLICT(player) DO UPDATE SET
+                cessi_spawnati = cessi_spawnati + 1
+        ''', (player,))
+
+    cur.execute("SELECT 1 FROM mon_first_win WHERE mon=?", (pokewinner,))
+    if cur.fetchone() is None:
+        cur.execute("INSERT INTO mon_first_win (mon, first_win_progr) VALUES (?, ?)",
+                    (pokewinner, progr))
+
+    for player in set(participants):
+        vinta = 1 if player == winner else 0
+        cur.execute('''
+            INSERT INTO player_weekly_stats (player, week, games, wins)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT(player, week) DO UPDATE SET
+                games = games + 1,
+                wins = wins + excluded.wins
+        ''', (player, week, vinta))
+
+    conn.commit()
+
+
+def rebuildStatsCache(conn):
+    '''Ricostruisce da zero mon_first_win/player_cesso_stats/player_weekly_stats
+    leggendo frigos/spawns in ordine di progr. Da rilanciare dopo una migrazione
+    iniziale o dopo un backfill che cambia winconato/pokewinner su frigo storiche
+    (es. backfill_winconato.py), altrimenti la cache incrementale andrebbe fuori
+    sync con quanto effettivamente successo in quelle frigo.'''
+    cur = conn.cursor()
+    cur.execute("DELETE FROM mon_first_win")
+    cur.execute("DELETE FROM player_cesso_stats")
+    cur.execute("DELETE FROM player_weekly_stats")
+    conn.commit()
+
+    cur.execute('''SELECT progr, week, player1, player2, player3, player4, winner, pokewinner
+        FROM frigos ORDER BY progr''')
+    frigo_rows = cur.fetchall()
+
+    for progr, week, p1, p2, p3, p4, winner, pokewinner in frigo_rows:
+        participants = [p for p in (p1, p2, p3, p4) if p is not None]
+        cur.execute("SELECT player, spawn, winconato FROM spawns WHERE frigo=?", (progr,))
+        spawns = [(r[0], r[1], bool(r[2])) for r in cur.fetchall()]
+        updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner)
 
 
 def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link):
@@ -19,10 +124,38 @@ def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link):
     conn.commit()
 
 
-def insertSpawn(conn, f_nr, player, spawn):
-    conn.execute("INSERT INTO spawns (frigo,player,spawn) VALUES (?,?,?)",
-                 (f_nr, player, spawn))
+def insertSpawn(conn, f_nr, player, spawn, winconato=False):
+    conn.execute("INSERT INTO spawns (frigo,player,spawn,winconato) VALUES (?,?,?,?)",
+                 (f_nr, player, spawn, int(winconato)))
     conn.commit()
+
+
+def setWinconato(conn, f_nr, player, spawn):
+    cur = conn.execute("UPDATE spawns SET winconato=1 WHERE frigo=? AND player=? AND spawn=?",
+                        (f_nr, player, spawn))
+    conn.commit()
+    return cur.rowcount
+
+
+def getFrigosToBackfillWinconato(conn, frigo_nrs=None):
+    cur = conn.cursor()
+    if frigo_nrs:
+        placeholders = ','.join('?' * len(frigo_nrs))
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE progr IN ({}) AND replay_link IS NOT NULL ORDER BY progr".format(placeholders),
+            frigo_nrs
+        )
+    else:
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE replay_link IS NOT NULL "
+            "AND progr NOT IN (SELECT DISTINCT frigo FROM spawns WHERE winconato = 1) "
+            "ORDER BY progr"
+        )
+    result = cur.fetchall()
+    cur.close()
+    return result
 
 
 def isSDReplayAlreadyLoaded(conn, sd_link):
@@ -314,18 +447,13 @@ def getPlayerInfo(conn, player):
 
 def getWeeklyGamesAndWinsByPlayer(conn, player):
     cur = conn.cursor()
-    query = '''select week,
-        count(*) as games,
-        sum(case when winner=? then 1 else 0 end) as wins
-    from frigos
-    where player1=? or player2=? or player3=? or player4=?
-    group by week'''
-    result = cur.execute(query, (player, player, player, player, player,))
+    result = cur.execute('''SELECT games, wins FROM player_weekly_stats
+        WHERE player=? ORDER BY week ASC''', (player,))
     games = []
     wins = []
     for r in result:
-        games.append(r[1])
-        wins.append(r[2])
+        games.append(r[0])
+        wins.append(r[1])
     return games, wins
 
 
@@ -603,11 +731,17 @@ def UnicumLadder(conn):
 
 
 def getNonVincenti(conn):
-    query = '''select s.spawn from (
+    '''Ritorna la lista dei "cessi" (animali mai vincitori di una frigo) insieme
+    al numero di volte in cui sono stati tentati come wincon (spawns.winconato)
+    e quindi, essendo cessi, hanno fallito la sverginata.'''
+    query = '''select s.spawn, coalesce(w.tentativi, 0) as tentativi from (
     select distinct spawn from spawns
-    )s left outer join 
+    )s left outer join
     (select distinct pokewinner from frigos)f
     on f.pokewinner=s.spawn
+    left outer join
+    (select spawn, count(*) as tentativi from spawns where winconato=1 group by spawn)w
+    on w.spawn=s.spawn
     where f.pokewinner is null
     order by s.spawn'''
 
@@ -616,7 +750,7 @@ def getNonVincenti(conn):
     cur.execute(query)
     result = cur.fetchall()
     for r in result:
-        spwaws.append(r[0])
+        spwaws.append((r[0], r[1]))
     return spwaws
 
 
@@ -708,3 +842,37 @@ def getMonsMissingTheLongest(conn, limit=10):
         mons.append(r[0])
         since.append(r[1])
     return mons, since
+
+
+def getCessiWinconByPlayer(conn, player):
+    '''Un "cesso" è un animale che, al momento in cui è stato usato come ultimo
+    pokemon (wincon, colonna spawns.winconato) da un giocatore in una frigo, non
+    aveva ancora mai vinto una frigo (indipendentemente da chi l'avesse usato).
+    Restituisce (tentativi, vittorie): quante volte il giocatore ha tentato la
+    wincon con un cesso e quante di quelle volte ha effettivamente sverginato
+    quell'animale.
+
+    Letto dalla cache player_cesso_stats (mantenuta incrementalmente da
+    db.updateStatsCacheForFrigo a ogni nuova frigo inserita).'''
+    cur = conn.cursor()
+    cur.execute("SELECT tentativi, vinte FROM player_cesso_stats WHERE player=?", (player,))
+    result = cur.fetchone()
+    if not result:
+        return 0, 0
+    return result[0], result[1]
+
+
+def getCessiSpawnsByPlayer(conn, player):
+    '''In quante frigo giocate il giocatore ha avuto in squadra almeno un "cesso"
+    (un animale che, al momento dello spawn, non aveva ancora mai vinto una frigo),
+    indipendentemente dal fatto che sia stato poi usato come wincon (spawns.winconato).
+    Conta le frigo, non i singoli spawn: più cessi nella stessa frigo contano una volta sola.
+
+    Letto dalla cache player_cesso_stats (mantenuta incrementalmente da
+    db.updateStatsCacheForFrigo a ogni nuova frigo inserita).'''
+    cur = conn.cursor()
+    cur.execute("SELECT cessi_spawnati FROM player_cesso_stats WHERE player=?", (player,))
+    result = cur.fetchone()
+    if not result or result[0] is None:
+        return 0
+    return result[0]
