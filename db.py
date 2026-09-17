@@ -826,6 +826,108 @@ def getSinceHowManyFrigosSpawn(conn, pokemon):
     return 10000
 
 
+def getWinconCountForPokemon(conn, pokemon):
+    '''Quante volte questo animale è stato l'ultimo pokemon in campo (wincon,
+    colonna spawns.winconato) per il suo giocatore, indipendentemente dal
+    fatto che quel giocatore abbia poi vinto la frigo.'''
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM spawns WHERE spawn=? AND winconato=1", (pokemon,))
+    result = cur.fetchone()
+    return result[0] if result else 0
+
+
+def getTopWinconizerForMon(conn, mon):
+    '''Tra i giocatori che hanno spawnato questo animale, quello che lo ha
+    scelto come wincon (spawns.winconato) nella percentuale più alta rispetto
+    alle volte in cui lo ha spawnato. Ritorna (player, wincon_cnt, spawn_cnt)
+    o (None, 0, 0) se nessuno lo ha mai winconato.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT player,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE spawn=?
+        GROUP BY player
+        HAVING wincon_cnt > 0
+        ORDER BY (wincon_cnt * 1.0 / spawn_cnt) DESC, wincon_cnt DESC
+        LIMIT 1
+    ''', (mon,))
+    result = cur.fetchone()
+    if not result:
+        return None, 0, 0
+    return result[0], result[1], result[2]
+
+
+def getMostFrequentWinconizerForMon(conn, mon):
+    '''Tra i giocatori che hanno spawnato questo animale, quello che lo ha
+    scelto come wincon (spawns.winconato) il maggior numero di volte in
+    assoluto. Ritorna (player, wincon_cnt, spawn_cnt) o (None, 0, 0) se
+    nessuno lo ha mai winconato.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT player,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE spawn=?
+        GROUP BY player
+        HAVING wincon_cnt > 0
+        ORDER BY wincon_cnt DESC, (wincon_cnt * 1.0 / spawn_cnt) DESC
+        LIMIT 1
+    ''', (mon,))
+    result = cur.fetchone()
+    if not result:
+        return None, 0, 0
+    return result[0], result[1], result[2]
+
+
+def getPreferredWinconByPlayer(conn, player):
+    '''Tra gli animali spawnati da questo giocatore, quello scelto come wincon
+    (spawns.winconato) nella percentuale più alta rispetto alle volte in cui lo
+    ha spawnato. Ritorna (mon, wincon_cnt, spawn_cnt) o (None, 0, 0) se il
+    giocatore non ha mai winconato nulla.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE player=?
+        GROUP BY spawn
+        HAVING wincon_cnt > 0
+        ORDER BY (wincon_cnt * 1.0 / spawn_cnt) DESC, wincon_cnt DESC
+        LIMIT 1
+    ''', (player,))
+    result = cur.fetchone()
+    if not result:
+        return None, 0, 0
+    return result[0], result[1], result[2]
+
+
+def getMostWinconedByPlayer(conn, player):
+    '''Tra gli animali spawnati da questo giocatore, quello scelto come wincon
+    (spawns.winconato) il maggior numero di volte in assoluto. Ritorna
+    (mon, wincon_cnt, spawn_cnt) o (None, 0, 0) se il giocatore non ha mai
+    winconato nulla.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE player=?
+        GROUP BY spawn
+        HAVING wincon_cnt > 0
+        ORDER BY wincon_cnt DESC, (wincon_cnt * 1.0 / spawn_cnt) DESC
+        LIMIT 1
+    ''', (player,))
+    result = cur.fetchone()
+    if not result:
+        return None, 0, 0
+    return result[0], result[1], result[2]
+
+
 def getMonsMissingTheLongest(conn, limit=10):
     query = '''select spawn, (select max(progr) from frigos) - max(frigo) as since
         from spawns
