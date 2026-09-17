@@ -251,6 +251,13 @@ async def swingers_command(update: Update, context: ContextTypes.DEFAULT_TYPE, p
     return
 
 
+async def wincons_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.topWincons(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 async def svergiconverters_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
         worker.svergiconvertersRanking(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
@@ -306,6 +313,8 @@ def start_bot(token, db_path):
 
     c_swingers = CommandHandler("swingers", partial(swingers_command, path=db_path))
 
+    c_wincons = CommandHandler("wincons", partial(wincons_command, path=db_path))
+
     c_svergiconverters = CommandHandler("svergiconverters", partial(svergiconverters_command, path=db_path))
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
 
@@ -332,6 +341,7 @@ def start_bot(token, db_path):
     application.add_handler(c_animali2)
     application.add_handler(c_desaparecidos)
     application.add_handler(c_swingers)
+    application.add_handler(c_wincons)
     application.add_handler(c_svergiconverters)
     application.add_handler(c_svergitryers)
     # Run the bot until the user presses Ctrl-C

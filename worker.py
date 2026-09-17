@@ -179,7 +179,7 @@ def swingRanking(db_path):
 
     results.sort(key=lambda x: x[1]['score'], reverse=True)
 
-    message = 'SwingScore Ranking\n\n'
+    message = 'SwingScore Ranking\n(EWR: estimated win rate)\n\n'
     for i, (player, swing) in enumerate(results):
         message = message + "<code>{}</code>) {:<10} <code>{}</code>  (EWR <code>{:.1f}%</code> ± <code>{:.1f}</code>)\n".format(
             i + 1, player, swing['score'], swing['mean_wr'], swing['true_stdev']
@@ -660,6 +660,17 @@ def desaparecidos(db_path, limit=10):
     for i in range(len(mons)):
         spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else '<code>{}</code>'.format(since[i])
         message = message + "\n<code>{}</code>) {} : {}".format(i + 1, mons[i], spawn_message)
+    return message
+
+
+def topWincons(db_path, limit=10):
+    c = db.openDbConn(db_path)
+    top = db.getTopWinconedMons(c, limit)
+    db.closeDbConn(c)
+
+    message = 'Top {} animali più winconati\n'.format(limit)
+    for i, (mon, wincon_cnt) in enumerate(top):
+        message = message + "\n<code>{}</code>) {} : <code>{}</code>".format(i + 1, mon, wincon_cnt)
     return message
 
 

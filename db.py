@@ -836,6 +836,20 @@ def getWinconCountForPokemon(conn, pokemon):
     return result[0] if result else 0
 
 
+def getTopWinconedMons(conn, limit=10):
+    '''I `limit` animali scelti più spesso come wincon (spawns.winconato),
+    indipendentemente da chi li ha spawnati. Ritorna una lista di tuple
+    (spawn, wincon_cnt) ordinata per wincon_cnt decrescente.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT spawn, COUNT(*) AS wincon_cnt
+        FROM spawns
+        WHERE winconato=1
+        GROUP BY spawn
+        ORDER BY wincon_cnt DESC
+        LIMIT ?''', (limit,))
+    return cur.fetchall()
+
+
 def getTopWinconizerForMon(conn, mon):
     '''Tra i giocatori che hanno spawnato questo animale, quello che lo ha
     scelto come wincon (spawns.winconato) nella percentuale più alta rispetto
