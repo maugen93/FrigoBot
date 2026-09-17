@@ -34,20 +34,24 @@ def insertResult(db_path, sd_link):
         players[pid]['id'] = player
 
     progr = db.getNumberOfFrigos(c) + 1
+    week = db.getActualWeek(c)
     # salvataggio spawns
+    spawns_for_cache = []
     for pid in list(players.keys()):
         player = players[pid]['id']
         ultimo_in_campo = players[pid]['ultimo_in_campo']
         for an in players[pid]['animali']:
-            db.insertSpawn(c, progr, player, an, winconato=(an == ultimo_in_campo))
+            winconato = (an == ultimo_in_campo)
+            db.insertSpawn(c, progr, player, an, winconato=winconato)
+            spawns_for_cache.append((player, an, winconato))
 
     winner_name = db.getPlayerFromSDName(c, winner)
     data = datetime.now().strftime('%d/%m/%y')
 
     # insert
-    db.insertNewFrigo(c, progr, db.getActualWeek(c), data, players['p1']['id'], players['p2']['id'],
-                      players['p3']['id'], players['p4']['id'],
-                      winner_name, poke_winner, sd_link)
+    participants = [players['p1']['id'], players['p2']['id'], players['p3']['id'], players['p4']['id']]
+    db.insertNewFrigo(c, progr, week, data, *participants, winner_name, poke_winner, sd_link)
+    db.updateStatsCacheForFrigo(c, progr, week, participants, spawns_for_cache, winner_name, poke_winner)
 
     message = "Inserita Frigo Nr `{}`\n\nPartecipanti:".format(progr)
     for pid in list(players.keys()):
@@ -593,15 +597,8 @@ def ListOfCessi(db_path):
     c = db.openDbConn(db_path)
     cess = db.getNonVincenti(c)
 
-    #manual fix
-    #cess.remove('Magearna-Original-Mega')
-    #cess.remove('Vivillon-Jungle')
-    #cess.remove('Vivillon-Marine')
-    #cess.remove('Morpeko-Hangry')
-    #end manual fix
-
     message = 'Animali che non hanno mai vinto una frigo\nTotale: `{}`\n\n'.format(len(cess))
-    message = message + str(cess).replace("'", "").replace('[', '').replace(']', '')
+    message = message + ', '.join('{} ({})'.format(mon, tentativi) for mon, tentativi in cess)
     db.closeDbConn(c)
     return message
 
