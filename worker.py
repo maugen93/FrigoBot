@@ -1,7 +1,6 @@
 from datetime import datetime
 import difflib
 import graph
-from telegram.helpers import escape_markdown
 import statistics
 import db
 import joks
@@ -53,7 +52,7 @@ def insertResult(db_path, sd_link):
     db.insertNewFrigo(c, progr, week, data, *participants, winner_name, poke_winner, sd_link)
     db.updateStatsCacheForFrigo(c, progr, week, participants, spawns_for_cache, winner_name, poke_winner)
 
-    message = "Inserita Frigo Nr `{}`\n\nPartecipanti:".format(progr)
+    message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)
     for pid in list(players.keys()):
         # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
         message = message + '\n{}'.format(players[pid]['id'])
@@ -67,7 +66,7 @@ def rank_all(db_path):
     players, wins, partecipate = db.getPlayerLeaderboard(c)
     message = 'Classifica All Time\n\n'
     for i in range(len(players)):
-        message = message + "`{}`) {}  `{}`\n".format(i + 1, players[i], wins[i])
+        message = message + "<code>{}</code>) {}  <code>{}</code>\n".format(i + 1, players[i], wins[i])
     db.closeDbConn(c)
     return message
 
@@ -86,10 +85,10 @@ def rank_season(db_path):
         players_dict_arr.append(player_dict)
     ordinati = sorted(players_dict_arr, key=lambda x: x["5-1"], reverse=True)
     for i in range(len(ordinati)):
-        message = message + "`{}`) {:<10} `{}`  [`{}`/`{}`]\n".format(i + 1, ordinati[i]['player'], ordinati[i]['5-1'],
+        message = message + "<code>{}</code>) {:<10} <code>{}</code>  [<code>{}</code>/<code>{}</code>]\n".format(i + 1, ordinati[i]['player'], ordinati[i]['5-1'],
                                                               ordinati[i]['wins'], ordinati[i]['part'])
 
-    message = message + '\nF counter: `{}`\n'.format(sum(wins))
+    message = message + '\nF counter: <code>{}</code>\n'.format(sum(wins))
     message = message + "Metodo Calcolo: 5-1\n"
     message = message + "Started: 01/07/2026\n"
     message = message + "Will end: 30/09/2026"
@@ -111,7 +110,7 @@ def rank_pkmn(db_path, limit=5):
             if pos > limit:
                 break
             message = message[:-2]
-            message = message + "\n[`{}`] (`{}` wins): ".format(pos, actual_wins)
+            message = message + "\n[<code>{}</code>] (<code>{}</code> wins): ".format(pos, actual_wins)
         message = message + pk[i]
         message = message + ', '
         # if i < limit:
@@ -125,9 +124,9 @@ def rank_week(db_path):
     c = db.openDbConn(db_path)
     w = db.getActualWeek(c)
     players, vinte, partecipate = db.getPlayerLeaderboard(c, week=w)
-    message = 'Classifica Settimana `{}`\n\n'.format(w)
+    message = 'Classifica Settimana <code>{}</code>\n\n'.format(w)
     for i in range(len(players)):
-        message = message + "`{}`) {:<10} `{}`  [`{}`]\n".format(i + 1, players[i], vinte[i], partecipate[i])
+        message = message + "<code>{}</code>) {:<10} <code>{}</code>  [<code>{}</code>]\n".format(i + 1, players[i], vinte[i], partecipate[i])
     db.closeDbConn(c)
     return message
 
@@ -148,7 +147,7 @@ def global_score(path):
     players, vinte, partecipate = db.getPlayerLeaderboard(conn, only_from_reg=True)
     db.closeDbConn(conn)
     scores = []
-    message = 'Classifica per score [MarvPondWR]\nPunteggio calcolato su `{}` f\n'.format(sum(vinte))
+    message = 'Classifica per score [MarvPondWR]\nPunteggio calcolato su <code>{}</code> f\n'.format(sum(vinte))
     for i in range(len(players)):
         # scores.append(int((vinte[i] / partecipate[i]) * math.log(partecipate[i]) * 1000))
         scores.append(logics.calcMarvWr(partecipate[i], vinte[i], sum(vinte)))
@@ -160,9 +159,9 @@ def global_score(path):
     partecipate_ord = list(partecipate_ord)
     scores_ord = list(scores_ord)
     for i in range(len(players)):
-        message = message + "\n`{}`) {}: ".format(i + 1, players_ord[i])
-        message = message + "`{}` ".format(scores_ord[i])
-        message = message + "[`{}`/`{}`]".format(vinte_ord[i], partecipate_ord[i])
+        message = message + "\n<code>{}</code>) {}: ".format(i + 1, players_ord[i])
+        message = message + "<code>{}</code> ".format(scores_ord[i])
+        message = message + "[<code>{}</code>/<code>{}</code>]".format(vinte_ord[i], partecipate_ord[i])
 
     return message
 
@@ -180,9 +179,9 @@ def swingRanking(db_path):
 
     results.sort(key=lambda x: x[1]['score'], reverse=True)
 
-    message = 'SwingScore Ranking\n\n'
+    message = 'SwingScore Ranking\n(EWR: estimated win rate)\n\n'
     for i, (player, swing) in enumerate(results):
-        message = message + "`{}`) {:<10} `{}`  (WR stimato `{:.1f}%` ± `{:.1f}`)\n".format(
+        message = message + "<code>{}</code>) {:<10} <code>{}</code>  (EWR <code>{:.1f}%</code> ± <code>{:.1f}</code>)\n".format(
             i + 1, player, swing['score'], swing['mean_wr'], swing['true_stdev']
         )
     return message
@@ -201,9 +200,9 @@ def svergiconvertersRanking(db_path):
 
     results.sort(key=lambda x: x[3], reverse=True)
 
-    message = 'Svergiconversione Ranking\n\n'
+    message = 'Svergiconversione Ranking\n(sverginate / frigo cessi winconati, frigo giocate)\n\n'
     for i, (player, vinte, tentativi, perc, giocate) in enumerate(results):
-        message = message + "`{}`) {:<10} `{:.1f}%` (`{}`/`{}` su `{}` giocate)\n".format(
+        message = message + "<code>{}</code>) {:<10} <code>{:.1f}%</code> (<code>{}</code>/<code>{}</code> su <code>{}</code>)\n".format(
             i + 1, player, perc, vinte, tentativi, giocate
         )
     return message
@@ -222,11 +221,10 @@ def svergitryersRanking(db_path):
 
     results.sort(key=lambda x: x[4], reverse=True)
 
-    message = 'Svergitentativi Ranking\n\n'
+    message = 'Svergitentativi Ranking\n(frigo cessi winconati / frigo cessi spawnati, sverginate)\n\n'
     for i, (player, vinte, tentativi, cessi_spawnati, perc) in enumerate(results):
-        sverg_text = 'sverginate' if vinte != 1 else 'sverginata'
-        message = message + "`{}`) {:<10} `{:.1f}%` (`{}/{}`, con `{}` {})\n".format(
-            i + 1, player, perc, tentativi, cessi_spawnati, vinte, sverg_text
+        message = message + "<code>{}</code>) {:<10} <code>{:.1f}%</code> (<code>{}/{}</code>, <code>{}</code>)\n".format(
+            i + 1, player, perc, tentativi, cessi_spawnati, vinte
         )
     return message
 
@@ -250,18 +248,38 @@ def wins_animale(animale, path):
 
     n_last_spawn=db.getSinceHowManyFrigosSpawn(conn, top_similar)
 
-    spawn_message='\n\nApparso letteralmente nell\'ultima frigo giocata' if n_last_spawn==0 else '\n\nNon si vede in giro da `{}` frigo'.format(n_last_spawn)
+    spawn_message='\n\nApparso letteralmente nell\'ultima frigo giocata' if n_last_spawn==0 else '\n\nNon si vede in giro da <code>{}</code> frigo'.format(n_last_spawn)
 
     spawns_count, wins_count = db.getSpawnsWithWinsOfPokemon(conn, top_similar)
+    wincon_count = db.getWinconCountForPokemon(conn, top_similar)
+    wincon_message = '\nWinconato <code>{}</code> volte'.format(wincon_count)
+    affettiva_player, affettiva_wincon_cnt, affettiva_spawn_cnt = db.getTopWinconizerForMon(conn, top_similar)
+    prediletta_player, prediletta_wincon_cnt, prediletta_spawn_cnt = db.getMostFrequentWinconizerForMon(conn, top_similar)
+
+    if affettiva_player and affettiva_player == prediletta_player:
+        wincon_message = wincon_message + '\nWincon affettiva e prediletta di {} (<code>{:.1f}%</code>, <code>{}/{}</code>)'.format(
+            affettiva_player, affettiva_wincon_cnt / affettiva_spawn_cnt * 100, affettiva_wincon_cnt, affettiva_spawn_cnt
+        )
+    else:
+        if affettiva_player:
+            wincon_message = wincon_message + '\nWincon maggiormente affettiva per {} (<code>{:.1f}%</code>, <code>{}/{}</code>)'.format(
+                affettiva_player, affettiva_wincon_cnt / affettiva_spawn_cnt * 100, affettiva_wincon_cnt, affettiva_spawn_cnt
+            )
+        if prediletta_player:
+            wincon_message = wincon_message + '\nWincon prediletta maggiormente da {} (<code>{}/{}</code>)'.format(
+                prediletta_player, prediletta_wincon_cnt, prediletta_spawn_cnt
+            )
     if len(wins) == 0:
-        return 'Sto cesso di {} non ha mai vinto una sebbene sia spawnato in almeno `{}` frigo'.format(top_similar,
-                                                                                                     spawns_count)+spawn_message
+        db.closeDbConn(conn)
+        return 'Sto cesso di {} non ha mai vinto una sebbene sia spawnato in almeno <code>{}</code> frigo'.format(top_similar,
+                                                                                                     spawns_count)+wincon_message+spawn_message
 
-    message = "Vittorie di {}: `{}`\n\n".format(top_similar, sum(wins))
+    message = "Vittorie di {}: <code>{}</code>\n\n".format(top_similar, sum(wins))
     for w in range(len(winners)):
-        message = message + "`{}` con {}\n".format(wins[w], winners[w])
+        message = message + "<code>{}</code> con {}\n".format(wins[w], winners[w])
 
-    message = message + '\nSu `{}` spawn registrati ha vinto `{}` volte'.format(spawns_count, wins_count)
+    message = message + '\nSu <code>{}</code> spawn registrati ha vinto <code>{}</code> volte'.format(spawns_count, wins_count)
+    message = message + wincon_message
     message =message +spawn_message
     db.closeDbConn(conn)
     return message
@@ -346,27 +364,27 @@ def playerCard(player, db_path):
 
     num_distinct_pk = db.getDistinctPokeByPlayer(conn, top_similar)
 
-    message = f"**{top_similar}**\n\n"
-    message = message + 'Frigo vinte overall `{}`{}\n'.format(num_wins, _formatRank(num_wins, all_wins))
-    message = message + 'Winrate `{0:.2f}%`{1} '.format(winrate_perc, _formatRank(winrate_perc, all_winrates))
+    message = f"<b>{top_similar}</b>\n\n"
+    message = message + 'Frigo vinte overall <code>{}</code>{}\n'.format(num_wins, _formatRank(num_wins, all_wins))
+    message = message + 'Winrate <code>{0:.2f}%</code>{1} '.format(winrate_perc, _formatRank(winrate_perc, all_winrates))
 
-    message = message + '(`{}`/`{}` su `{}` registrate)\n'.format(
+    message = message + '(<code>{}</code>/<code>{}</code> su <code>{}</code> registrate)\n'.format(
         winsWhenPlayed, len(winners_whenPlayed), db.getNumFrigoWithPlayersSpecified(conn)
     )
 
-    message = message + 'MarvWr Score: `{}`{} '.format(marvWr, _formatRank(marvWr, all_marvwr))
+    message = message + 'MarvWr Score: <code>{}</code>{} '.format(marvWr, _formatRank(marvWr, all_marvwr))
 
     if winrate_variability is None:
         message = message + '\n→ SwingScore: n/d (dati non sufizienti)\n'
     else:
-        message = message + '\n→ SwingScore: `{}`{} (WR stimato `{:.1f}%` ± `{:.1f}`)\n'.format(
+        message = message + '\n→ SwingScore: <code>{}</code>{} (EWR <code>{:.1f}%</code> ± <code>{:.1f}</code>)\n'.format(
             winrate_variability['score'], _formatRank(winrate_variability['score'], all_swing),
             winrate_variability['mean_wr'], winrate_variability['true_stdev']
         )
 
-    message = message + '\nDistinto al `{0:.1f}%`'.format(num_distinct_pk * 100 / num_wins)
-    message = message + ' con `{}` distinti animali\n'.format(num_distinct_pk)
-    message = message + 'Animali Unici: `{}`{}\n'.format(
+    message = message + '\nDistinto al <code>{0:.1f}%</code>'.format(num_distinct_pk * 100 / num_wins)
+    message = message + ' con <code>{}</code> distinti animali\n'.format(num_distinct_pk)
+    message = message + 'Animali Unici: <code>{}</code>{}\n'.format(
         len(animali_unici), _formatRank(len(animali_unici), all_animali_unici)
     )
 
@@ -374,21 +392,39 @@ def playerCard(player, db_path):
         message = message + 'Svergiconversione: n/d (e quando mai ci ha provato)\n'
     else:
         cessi_wr = cessi_vinte / cessi_tentativi * 100
-        message = message + 'Svergiconversione: `{0:.1f}%`{1} (`{2}` su `{3}` tentativi)\n'.format(
+        message = message + 'Svergiconversione: <code>{0:.1f}%</code>{1} (<code>{2}</code> su <code>{3}</code> tentativi)\n\n'.format(
             cessi_wr, _formatRank(cessi_wr, all_cessi_wr), cessi_vinte, cessi_tentativi
         )
+
+    affettiva_mon, affettiva_wincon_cnt, affettiva_spawn_cnt = db.getPreferredWinconByPlayer(conn, top_similar)
+    prediletta_mon, prediletta_wincon_cnt, prediletta_spawn_cnt = db.getMostWinconedByPlayer(conn, top_similar)
+
+    if affettiva_mon and affettiva_mon == prediletta_mon:
+        message = message + 'Wincon affettiva e prediletta: {} <code>{:.1f}%</code> (<code>{}</code>/<code>{}</code>)\n'.format(
+            affettiva_mon, affettiva_wincon_cnt / affettiva_spawn_cnt * 100, affettiva_wincon_cnt, affettiva_spawn_cnt
+        )
+    else:
+        if affettiva_mon:
+            message = message + 'Wincon affettiva: {} <code>{:.1f}%</code> (<code>{}</code>/<code>{}</code>)\n'.format(
+                affettiva_mon, affettiva_wincon_cnt / affettiva_spawn_cnt * 100, affettiva_wincon_cnt, affettiva_spawn_cnt
+            )
+        if prediletta_mon:
+            message = message + 'Wincon prediletta: {} (<code>{}</code>/<code>{}</code>)\n'.format(
+                prediletta_mon, prediletta_wincon_cnt, prediletta_spawn_cnt
+            )
+
     pk, cnts = db.getMostPokeWinnerByPlayer(conn, top_similar)
     db.closeDbConn(conn)
 
     cnt_i = cnts[0]
-    message = message + "\nAmici Vincenti:\n\t\t[`{}`]: ".format(cnt_i)
+    message = message + "\nAmici Vincenti:\n\t\t[<code>{}</code>]: ".format(cnt_i)
 
     for i in range(len(pk)):
         if i < 10:
             if cnts[i] < cnt_i:
                 cnt_i = cnts[i]
                 message = message[:-2]
-                message = message + "\n\t\t[`{}`]: ".format(cnt_i)
+                message = message + "\n\t\t[<code>{}</code>]: ".format(cnt_i)
                 message = message + "{}, ".format(pk[i])
             else:
                 message = message + "{}, ".format(pk[i])
@@ -423,13 +459,13 @@ def secchezza(player, db_path):
     if secchezza == 0:
         message = "il porco ha vinto l'ultima frigo che ha giocato\n"
     else:
-        message = '{} non vince da `{}` frigo giocate\n'.format(top_similar, secchezza)
-    message = message + 'ultima frigo giocata `{}` frigo fa\n'.format(notgame)
+        message = '{} non vince da <code>{}</code> frigo giocate\n'.format(top_similar, secchezza)
+    message = message + 'ultima frigo giocata <code>{}</code> frigo fa\n'.format(notgame)
 
     w = db.getActualWeek(conn)
     print(w)
     num_in_week = db.getPartecipiedAtWeek(conn, w, top_similar)
-    message = message + 'Frigo giocate in settimana: `{}`'.format(num_in_week)
+    message = message + 'Frigo giocate in settimana: <code>{}</code>'.format(num_in_week)
     db.closeDbConn(conn)
     return message
 
@@ -442,9 +478,7 @@ def tagger(db_path):
     for t in tags:
         if not t:
             continue
-        # tg_tag può contenere '_' (es. @il_fatoh), che in Markdown legacy
-        # è un carattere speciale non accoppiato e fa fallire l'invio
-        message = message + '{} '.format(escape_markdown(t, version=1))
+        message = message + '{} '.format(t)
     return message + 'frigo'
 
 
@@ -516,26 +550,26 @@ def closeWeek(db_path):
         if score_diff < min_increment:
             min_increment = score_diff
             who_not_smile = players[i]
-    message = '🔴Chiusa settimana `{}`\n\n'.format(actual_w)
-    message = message + '👳Califfa {} con `{}` vittorie\n\n'.format(calippo, vinte[0])
-    message = message + '🐖Porco di settimana: {} (`{}` su `{}`)\n'.format(most_pig, vinte[players.index(most_pig)],
+    message = '🔴Chiusa settimana <code>{}</code>\n\n'.format(actual_w)
+    message = message + '👳Califfa {} con <code>{}</code> vittorie\n\n'.format(calippo, vinte[0])
+    message = message + '🐖Porco di settimana: {} (<code>{}</code> su <code>{}</code>)\n'.format(most_pig, vinte[players.index(most_pig)],
                                                                       partecipate[players.index(most_pig)])
-    message = message + '🤏Il più rachitico: {} (`{}` su `{}`)\n\n'.format(most_thin, vinte[players.index(most_thin)],
+    message = message + '🤏Il più rachitico: {} (<code>{}</code> su <code>{}</code>)\n\n'.format(most_thin, vinte[players.index(most_thin)],
                                                                       partecipate[players.index(most_thin)])
     message = message + '😆E in tutto ciò chi ride?\n'
-    message = message + '¬ Di certo non {} (`{}` MarvWr points)\n'.format(who_not_smile, min_increment)
-    message = message + '¬ Tendenzialmente ride {} (+`{}` MarvWr points)\n\n'.format(who_smile, max_increment)
+    message = message + '¬ Di certo non {} (<code>{}</code> MarvWr points)\n'.format(who_not_smile, min_increment)
+    message = message + '¬ Tendenzialmente ride {} (+<code>{}</code> MarvWr points)\n\n'.format(who_smile, max_increment)
 
     if len(cessi) > 0:
-        message = message + '🔞Sono stati sverginati `{}` cessi, principalmente da {}\n\n'.format(
+        message = message + '🔞Sono stati sverginati <code>{}</code> cessi, principalmente da {}\n\n'.format(
             len(list(set(cessi))), joks.str_sverg(sverginatori))
     else:
         message = message + '🔞Nessun cesso è stato sverginato\n\n'
 
-    message = message + '🧊La settimana è durata `{}` giorni e si è frigato per un ammontare complessivo di `{}` frigo, '.format(durata_giorni,sum(vinte))
+    message = message + '🧊La settimana è durata <code>{}</code> giorni e si è frigato per un ammontare complessivo di <code>{}</code> frigo, '.format(durata_giorni,sum(vinte))
     f_per_day=sum(vinte)/durata_giorni
     message = message + 'per una media {} '.format(joks.commentoMedia(f_per_day))
-    message = message + 'di `{0:.2f}` frigo al giorno\n\n'.format(f_per_day)
+    message = message + 'di <code>{0:.2f}</code> frigo al giorno\n\n'.format(f_per_day)
     w, f = db.getNumberOfFrigoPerWeek(conn)
 
     start_date_week_prec,end_date_week_prec=db.getWeekInfo(conn,actual_w-1)
@@ -545,11 +579,11 @@ def closeWeek(db_path):
 
     differenziale = (f_per_day - f_per_day_prec)
     if differenziale>=0:
-        message = message + '📊+`{0:.2f}` frigo al giorno '.format(differenziale)
+        message = message + '📊+<code>{0:.2f}</code> frigo al giorno '.format(differenziale)
     else:
-        message = message + '📊`{0:.2f}` frigo al giorno '.format(differenziale)
-    message = message + 'rispetto a settimana `{}`\n\n'.format(w[-2])
-    message = message + '🏃‍♂️‍➡️Maggior contribuente: {} (`{}`)'.format(players[partecipate.index(max(partecipate))],
+        message = message + '📊<code>{0:.2f}</code> frigo al giorno '.format(differenziale)
+    message = message + 'rispetto a settimana <code>{}</code>\n\n'.format(w[-2])
+    message = message + '🏃‍♂️‍➡️Maggior contribuente: {} (<code>{}</code>)'.format(players[partecipate.index(max(partecipate))],
                                                                       max(partecipate))
 
     db.closeDbConn(conn)
@@ -560,9 +594,9 @@ def LadderUnici(db_path):
     c = db.openDbConn(db_path)
 
     players, unici = db.UnicumLadder(c)
-    message = 'Wins con animali unici (`{}`)\n'.format(sum(unici))
+    message = 'Wins con animali unici (<code>{}</code>)\n'.format(sum(unici))
     for i in range(len(players)):
-        message = message + '\n`{}`) {} `{}`'.format(i + 1, players[i], unici[i])
+        message = message + '\n<code>{}</code>) {} <code>{}</code>'.format(i + 1, players[i], unici[i])
 
     db.closeDbConn(c)
     return message
@@ -584,9 +618,9 @@ def UniciPlayer(player, db_path):
         return "non conosco questo {}".format(player)
 
     animali, wins = db.getUnicumByPlayer(c, top_similar)
-    message = 'Unici di {}: `{}`\n\n'.format(top_similar, len(animali))
+    message = 'Unici di {}: <code>{}</code>\n\n'.format(top_similar, len(animali))
     for i in range(len(animali)):
-        add_on = '{} (`{}`), '.format(animali[i], wins[i]) if wins[i] > 1 else '{}, '.format(animali[i])
+        add_on = '{} (<code>{}</code>), '.format(animali[i], wins[i]) if wins[i] > 1 else '{}, '.format(animali[i])
         message = message + add_on
 
     db.closeDbConn(c)
@@ -597,7 +631,7 @@ def ListOfCessi(db_path):
     c = db.openDbConn(db_path)
     cess = db.getNonVincenti(c)
 
-    message = 'Animali che non hanno mai vinto una frigo\nTotale: `{}`\n\n'.format(len(cess))
+    message = 'Animali che non hanno mai vinto una frigo\nTotale: <code>{}</code>\n\n'.format(len(cess))
     message = message + ', '.join('{} ({})'.format(mon, tentativi) for mon, tentativi in cess)
     db.closeDbConn(c)
     return message
@@ -606,12 +640,12 @@ def ListOfCessi(db_path):
 def WinrateAnimali(db_path):
     c = db.openDbConn(db_path)
     animali, spawns, wins = db.getPokemonWinsPerSpawns(c)
-    message = 'Classifica animali per winrate (campione di `{}` f)\n'.format(sum(wins))
+    message = 'Classifica animali per winrate (campione di <code>{}</code> f)\n'.format(sum(wins))
 
     for i in range(10):
-        message = message + "\n`{}`) {} : ".format(i + 1, animali[i])
-        message = message + '`{0:.2f}%` '.format(wins[i] * 100 / spawns[i])
-        message = message + ' [`{}`/`{}`]'.format(wins[i], spawns[i])
+        message = message + "\n<code>{}</code>) {} : ".format(i + 1, animali[i])
+        message = message + '<code>{0:.2f}%</code> '.format(wins[i] * 100 / spawns[i])
+        message = message + ' [<code>{}</code>/<code>{}</code>]'.format(wins[i], spawns[i])
     db.closeDbConn(c)
     message = message + '\n\nN.B. Vari Arceus esclusi dal calcolo'
     return message
@@ -624,8 +658,20 @@ def desaparecidos(db_path, limit=10):
 
     message = 'Animali scomparsi da più tempo\n'
     for i in range(len(mons)):
-        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else '`{}`'.format(since[i])
-        message = message + "\n`{}`) {} : {}".format(i + 1, mons[i], spawn_message)
+        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else '<code>{}</code>'.format(since[i])
+        message = message + "\n<code>{}</code>) {} : {}".format(i + 1, mons[i], spawn_message)
+    return message
+
+
+def topWincons(db_path, limit=10):
+    c = db.openDbConn(db_path)
+    top = db.getTopWinconedMons(c, limit)
+    db.closeDbConn(c)
+
+    message = 'Top {} animali più winconati\n'.format(limit)
+    for i, (mon, wincon_cnt, wins) in enumerate(top):
+        wr = wins / wincon_cnt * 100
+        message = message + "\n<code>{}</code>) {}: <code>{}</code> (<code>{:.0f}%</code>)".format(i + 1, mon, wincon_cnt, wr)
     return message
 
 
@@ -636,8 +682,8 @@ def calippi(db_path):
 
     pos = 1
     for k in califfi:
-        mess_cond = "(cond `{}`)".format(k[1]['califfi_cond']) if k[1]['califfi_cond'] > 0 else ''
-        message = message + '`{}`) {} `{}` {}\n'.format(pos, k[0], k[1]['califfi'], mess_cond)
+        mess_cond = "(cond <code>{}</code>)".format(k[1]['califfi_cond']) if k[1]['califfi_cond'] > 0 else ''
+        message = message + '<code>{}</code>) {} <code>{}</code> {}\n'.format(pos, k[0], k[1]['califfi'], mess_cond)
         pos += 1
     db.closeDbConn(c)
     return message
