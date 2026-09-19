@@ -8,7 +8,9 @@ dependencies = [
     "matplotlib>=3.11.1",
     "numpy>=2.5.2",
     "pandas>=3.0.5",
+    "python-dotenv>=1.2.3",
     "python-telegram-bot>=22.8",
     "requests>=2.34.2",
+    "rich>=15.0.0",
     "scipy>=1.18.1",
 ]

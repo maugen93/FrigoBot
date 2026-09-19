@@ -137,6 +137,39 @@ def setWinconato(conn, f_nr, player, spawn):
     return cur.rowcount
 
 
+def getFrigosByMon(conn, mon):
+    '''Trova le frigo (progr, replay_link) in cui `mon` compare come spawn di
+    qualche giocatore o come pokewinner, per poterle rileggere e correggere
+    (es. dopo una fix a replay_reader.get_clean_mon_name). Solo le frigo con
+    un replay_link, ordinate per progr.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT DISTINCT f.progr, f.replay_link
+        FROM frigos f
+        WHERE f.replay_link IS NOT NULL
+        AND (f.pokewinner=? OR f.progr IN (SELECT frigo FROM spawns WHERE spawn=?))
+        ORDER BY f.progr''', (mon, mon))
+    return cur.fetchall()
+
+
+def getSpawnsForFrigoPlayer(conn, frigo, player):
+    cur = conn.cursor()
+    cur.execute("SELECT spawn, winconato FROM spawns WHERE frigo=? AND player=?", (frigo, player))
+    return cur.fetchall()
+
+
+def deleteSpawn(conn, frigo, player, spawn):
+    cur = conn.execute("DELETE FROM spawns WHERE frigo=? AND player=? AND spawn=?",
+                        (frigo, player, spawn))
+    conn.commit()
+    return cur.rowcount
+
+
+def updatePokewinner(conn, frigo, new_pokewinner):
+    cur = conn.execute("UPDATE frigos SET pokewinner=? WHERE progr=?", (new_pokewinner, frigo))
+    conn.commit()
+    return cur.rowcount
+
+
 def getFrigosToBackfillWinconato(conn, frigo_nrs=None):
     cur = conn.cursor()
     if frigo_nrs:

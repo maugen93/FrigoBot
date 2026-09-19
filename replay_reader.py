@@ -9,6 +9,10 @@ def get_clean_mon_name(mon_name):
 Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment|Johto|Lemon-Cream|Salted-Cream|Indigo|Blue|Green|Red|Orange|Yellow|Antique|Elegant|World|\
     Three-Segment|White|Noice|Stretchy|Low-Key|Blue-Striped|Original|Resolute|HighPlains|Masterpiece|Stellar|Savanna|High Plains|Jungle|Marine\
     """
+    # formes that look cosmetic (and would match ALT_FORMS below) but are
+    # actually distinct Pokemon with their own stats/moves, so they must
+    # NOT be collapsed into their base species
+    NON_COSMETIC_FORMS = ['Kyurem-White', 'Kyurem-Black']
     other_animals=['Pikachu']
     s = mon_name.rstrip()
     s = re.sub(r'^([a-zA-Z-]+)\(\1-([a-zA-Z-]+)\)$', r'\1-\2', s)
@@ -19,7 +23,8 @@ Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment
     s = re.sub(r'\(fainted\)$', '', s)
     match = re.search(r'\(([^)]+)\)', s)
     s = match.group(1) if match else s
-    s = re.sub(rf'\-({ALT_FORMS})$', '', s)
+    if s not in NON_COSMETIC_FORMS:
+        s = re.sub(rf'\-({ALT_FORMS})$', '', s)
     for ot_n in other_animals:
         if ot_n in s:
             return ot_n
@@ -30,7 +35,6 @@ def elab_sd_replay(link_replay):
     data = json.loads(
         requests.get(link_replay + ".json").content)
 
-    pokewinner = None
     players = data['players']
 
     players = {'p1': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
@@ -71,18 +75,8 @@ def elab_sd_replay(link_replay):
         if p.get('collo') == winner:
             winner_id = k
 
-    # scorro al contrario per trovare il pokewinner
-    for i in range(len(log_rows) - 1, 0, -1):
-        log = log_rows[i]
-        if winner_id in log and ": " in log:
-            pokewinner = log.split(': ')[1].split('|')[0]
-            break
-
-    # adjust pokewinner
-    for pkmn in players[winner_id]['animali']:
-        if pokewinner in pkmn:
-            pokewinner = pkmn
-            break
+    # il pokewinner e' il wincon del vincitore, cioe' l'ultimo animale che ha mandato in campo
+    pokewinner = players[winner_id]['ultimo_in_campo']
 
     return players, winner, pokewinner
 

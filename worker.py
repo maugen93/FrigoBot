@@ -434,6 +434,41 @@ def playerCard(player, db_path):
     return message
 
 
+def pokewinners(player, db_path):
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    top_similar = None
+    top_similitude = 0
+    for m in players:
+        seq = difflib.SequenceMatcher(a=player.lower(), b=m.lower())
+        if seq.ratio() > 0.7 and seq.ratio() > top_similitude:
+            top_similar = m
+            top_similitude = seq.ratio()
+
+    if not top_similar:
+        db.closeDbConn(conn)
+        return "non conosco questo {}".format(player)
+
+    pks, cnts = db.getMostPokeWinnerByPlayer(conn, top_similar)
+    db.closeDbConn(conn)
+
+    if not pks:
+        return "{} non ha mai vinto una frigo, scarsismo".format(top_similar)
+
+    cnt_i = cnts[0]
+    message = "<b>{}</b> ha trionfato con codesti animali:\n\n\t\t[<code>{}</code>]: ".format(top_similar, cnt_i)
+    for i in range(len(pks)):
+        if cnts[i] < cnt_i:
+            cnt_i = cnts[i]
+            message = message[:-2]
+            message = message + "\n\t\t[<code>{}</code>]: ".format(cnt_i)
+            message = message + "{}, ".format(pks[i])
+        else:
+            message = message + "{}, ".format(pks[i])
+    message = message[:-2]
+    return message
+
+
 def secchezza(player, db_path):
     conn = db.openDbConn(db_path)
     players = db.getAllPlayers(conn)

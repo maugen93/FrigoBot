@@ -153,6 +153,23 @@ async def player_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
         return
 
 
+async def pokewinners_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    command = update.message.text
+    cmds = command.split(' ')
+    if len(cmds) > 1:
+        player = command.replace("/pokewinners ", '')
+        message = worker.pokewinners(player, path)
+        await update.message.reply_text(
+            message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+    else:
+        await update.message.reply_text(
+            'e dimmi chi', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+
 async def secchezza_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     cmds = command.split(' ')
@@ -292,6 +309,7 @@ def start_bot(token, db_path):
     c_tag = CommandHandler("tag", partial(tag_command, path=db_path))
 
     c_pl = CommandHandler("player", partial(player_command, path=db_path))
+    c_pokewinners = CommandHandler("pokewinners", partial(pokewinners_command, path=db_path))
     c_sec = CommandHandler("secchezza", partial(secchezza_command, path=db_path))
 
     c_and = CommandHandler("andazzo", partial(andazzo_command, path=db_path))
@@ -330,6 +348,7 @@ def start_bot(token, db_path):
     application.add_handler(c_animale)
     application.add_handler(c_global)
     application.add_handler(c_pl)
+    application.add_handler(c_pokewinners)
     application.add_handler(c_sec)
     application.add_handler(c_and)
     application.add_handler(c_lad)
