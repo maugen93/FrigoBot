@@ -30,7 +30,6 @@ def elab_sd_replay(link_replay):
     data = json.loads(
         requests.get(link_replay + ".json").content)
 
-    pokewinner = None
     players = data['players']
 
     players = {'p1': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
@@ -71,18 +70,8 @@ def elab_sd_replay(link_replay):
         if p.get('collo') == winner:
             winner_id = k
 
-    # scorro al contrario per trovare il pokewinner
-    for i in range(len(log_rows) - 1, 0, -1):
-        log = log_rows[i]
-        if winner_id in log and ": " in log:
-            pokewinner = log.split(': ')[1].split('|')[0]
-            break
-
-    # adjust pokewinner
-    for pkmn in players[winner_id]['animali']:
-        if pokewinner in pkmn:
-            pokewinner = pkmn
-            break
+    # il pokewinner e' il wincon del vincitore, cioe' l'ultimo animale che ha mandato in campo
+    pokewinner = players[winner_id]['ultimo_in_campo']
 
     return players, winner, pokewinner
 
