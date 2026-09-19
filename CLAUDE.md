@@ -17,7 +17,7 @@ uv run python main.py
 
 `uv run` executes commands inside the project's managed virtualenv (`.venv`), syncing dependencies first if needed — no manual `pip install`/`venv activate` required. Same goes for the ad-hoc scripts below, e.g. `uv run python tests.py`.
 
-`main.py` hardcodes the Telegram bot token and the Windows filesystem path to `frigo.db` (this project was developed on Windows) — both need to be adjusted for the local environment before running. `bot.start_bot(token, db_path)` wires up all command handlers and starts polling.
+`main.py` reads the Telegram bot token from the `TELEGRAM_BOT_TOKEN` env var (via a local `.env` file, gitignored — see `.env.example`) and hardcodes the Windows filesystem path to `frigo.db` (this project was developed on Windows), which needs to be adjusted for the local environment before running. `bot.start_bot(token, db_path)` wires up all command handlers and starts polling.
 
 There are no automated tests. `tests.py` and `summaries.py` are ad-hoc one-off scripts (module-level code that executes on import, hardcoded Windows paths, hardcoded frigo-number ranges) used manually for exploration/reporting — not a real test suite and not meant to be run as-is.
 

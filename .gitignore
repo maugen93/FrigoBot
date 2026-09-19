@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+
+frigo.db
+frigo.db-journal
+frigo.db-wal
+frigo.db-shm
+frigo.db.bak*
