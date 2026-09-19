@@ -469,6 +469,66 @@ def pokewinners(player, db_path):
     return message
 
 
+def predilette(player, db_path, limit=10):
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    top_similar = None
+    top_similitude = 0
+    for m in players:
+        seq = difflib.SequenceMatcher(a=player.lower(), b=m.lower())
+        if seq.ratio() > 0.7 and seq.ratio() > top_similitude:
+            top_similar = m
+            top_similitude = seq.ratio()
+
+    if not top_similar:
+        db.closeDbConn(conn)
+        return "non conosco questo {}".format(player)
+
+    top = db.getTopMostWinconedByPlayer(conn, top_similar, limit)
+    db.closeDbConn(conn)
+
+    if not top:
+        return "{} non ha mai winconato nulla, scarsismo".format(top_similar)
+
+    message = "<b>{}</b> - Top {} wincon predilette (per numero di volte):\n".format(top_similar, len(top))
+    for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top):
+        wr = wincon_cnt / spawn_cnt * 100
+        message = message + "\n<code>{}</code>) {}: <code>{}</code> (<code>{:.0f}%</code>)".format(
+            i + 1, mon, wincon_cnt, wr
+        )
+    return message
+
+
+def affettive(player, db_path, limit=10):
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    top_similar = None
+    top_similitude = 0
+    for m in players:
+        seq = difflib.SequenceMatcher(a=player.lower(), b=m.lower())
+        if seq.ratio() > 0.7 and seq.ratio() > top_similitude:
+            top_similar = m
+            top_similitude = seq.ratio()
+
+    if not top_similar:
+        db.closeDbConn(conn)
+        return "non conosco questo {}".format(player)
+
+    top = db.getTopPreferredWinconsByPlayer(conn, top_similar, limit)
+    db.closeDbConn(conn)
+
+    if not top:
+        return "{} non ha mai winconato nulla, scarsismo".format(top_similar)
+
+    message = "<b>{}</b> - Top {} wincon affettive (per percentuale):\n".format(top_similar, len(top))
+    for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top):
+        wr = wincon_cnt / spawn_cnt * 100
+        message = message + "\n<code>{}</code>) {}: <code>{:.0f}%</code> (<code>{}</code>/<code>{}</code>)".format(
+            i + 1, mon, wr, wincon_cnt, spawn_cnt
+        )
+    return message
+
+
 def secchezza(player, db_path):
     conn = db.openDbConn(db_path)
     players = db.getAllPlayers(conn)

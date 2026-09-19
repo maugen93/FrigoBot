@@ -979,6 +979,46 @@ def getMostWinconedByPlayer(conn, player):
     return result[0], result[1], result[2]
 
 
+def getTopPreferredWinconsByPlayer(conn, player, limit=10):
+    '''I `limit` animali spawnati da questo giocatore scelti come wincon
+    (spawns.winconato) con la percentuale più alta rispetto alle volte in cui
+    li ha spawnati. Ritorna una lista di tuple (mon, wincon_cnt, spawn_cnt)
+    ordinata per percentuale decrescente.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE player=?
+        GROUP BY spawn
+        HAVING wincon_cnt > 0
+        ORDER BY (wincon_cnt * 1.0 / spawn_cnt) DESC, wincon_cnt DESC
+        LIMIT ?
+    ''', (player, limit))
+    return cur.fetchall()
+
+
+def getTopMostWinconedByPlayer(conn, player, limit=10):
+    '''I `limit` animali spawnati da questo giocatore scelti come wincon
+    (spawns.winconato) il maggior numero di volte in assoluto. Ritorna una
+    lista di tuple (mon, wincon_cnt, spawn_cnt) ordinata per wincon_cnt
+    decrescente.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE player=?
+        GROUP BY spawn
+        HAVING wincon_cnt > 0
+        ORDER BY wincon_cnt DESC, (wincon_cnt * 1.0 / spawn_cnt) DESC
+        LIMIT ?
+    ''', (player, limit))
+    return cur.fetchall()
+
+
 def getMonsMissingTheLongest(conn, limit=10):
     query = '''select spawn, (select max(progr) from frigos) - max(frigo) as since
         from spawns
