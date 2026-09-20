@@ -7,11 +7,12 @@ from telegram.ext import (
     filters,
 )
 from functools import partial
+import os
 import time
 
 import worker
 
-SUPER_USERS = [170532946]
+SUPER_USERS = [int(uid) for uid in os.environ['SUPER_USERS'].split(',')]
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = worker.insertResult(path, update.message.text)

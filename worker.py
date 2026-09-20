@@ -263,7 +263,7 @@ def svergiconvertersRanking(db_path):
 
     results.sort(key=lambda x: x[3], reverse=True)
 
-    message = 'Svergiconversione Ranking\n(sverginate / frigo cessi winconati, frigo giocate)\n\n'
+    message = 'Svergiconversione Ranking\n(sverginate / frigo cessi winconati su frigo giocate)\n\n'
 
     rank_width = len(str(len(results)))
     name_width = max((len(player) for player, _, _, _, _ in results), default=0)

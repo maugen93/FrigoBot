@@ -1,5 +1,5 @@
 import sqlite3
-import pandas
+import polars
 
 
 def openDbConn(dbpath):
@@ -255,7 +255,7 @@ def getActualWeek(conn):
 
 
 def load_old_frigo_from_csv(db_path, csv_path):
-    frigodata = pandas.read_csv(csv_path)
+    frigodata = polars.read_csv(csv_path)
     progrs = list(frigodata['Frigo'])
     weeks = list(frigodata['Week'])
     datas = list(frigodata['Data'])
