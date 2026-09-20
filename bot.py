@@ -13,6 +13,16 @@ import worker
 
 SUPER_USERS = [170532946]
 
+RESTRICTED_COMMANDS = {"query", "tag", "closeweek"}
+
+ALL_COMMANDS = [
+    "week", "animali", "animali2", "season", "siso", "califfi", "score", "animale",
+    "global", "query", "tag", "player", "pokewinners", "predilette", "affettive",
+    "secchezza", "andazzo", "ladder", "closeweek", "calc", "unicums", "unicum",
+    "cessi", "desaparecidos", "swingers", "wincons", "svergiconverters",
+    "svergitryers", "comandi", "frigo",
+]
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = worker.insertResult(path, update.message.text)
     if message:
@@ -153,6 +163,28 @@ async def player_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
         return
 
 
+async def frigo_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    command = update.message.text
+    cmds = command.split(' ')
+    if len(cmds) > 1:
+        arg = command.replace("/frigo ", '').strip()
+        if not arg.isdigit():
+            await update.message.reply_text(
+                'e dammi un numero', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+            )
+            return
+        message = worker.frigoInfo(int(arg), path)
+        await update.message.reply_text(
+            message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+    else:
+        await update.message.reply_text(
+            'e dammi un numero', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+
 async def pokewinners_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     cmds = command.split(' ')
@@ -231,14 +263,17 @@ async def andazzo_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
 
 
 async def ladder_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
-    # tab_path = worker.Ladder(path)
-
-    # await update.message.reply_photo(
-    #    tab_path,caption='Ladder', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
-    # )
-    # return
     await update.message.reply_text(
         'fottiti', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
+async def comandi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    comandi = sorted(c for c in ALL_COMMANDS if c not in RESTRICTED_COMMANDS)
+    message = "Ecco i comandi che puoi usare:\n\n" + "\n".join(f"/{c}" for c in comandi)
+    await update.message.reply_text(
+        message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -342,6 +377,8 @@ def start_bot(token, db_path):
     c_query = CommandHandler("query", partial(query_command, path=db_path))
     c_tag = CommandHandler("tag", partial(tag_command, path=db_path))
 
+    c_frigo = CommandHandler("frigo", partial(frigo_command, path=db_path))
+
     c_pl = CommandHandler("player", partial(player_command, path=db_path))
     c_pokewinners = CommandHandler("pokewinners", partial(pokewinners_command, path=db_path))
     c_predilette = CommandHandler("predilette", partial(predilette_command, path=db_path))
@@ -355,6 +392,8 @@ def start_bot(token, db_path):
     c_cw = CommandHandler("closeweek", partial(closeweek_command, path=db_path))
 
     c_calc = CommandHandler("calc", send_link_calc)
+
+    c_comandi = CommandHandler("comandi", comandi_command)
 
     c_uni_lad = CommandHandler("unicums", partial(unicum_ladder_command, path=db_path))
     c_uni_pl = CommandHandler("unicum", partial(unicum_player_command, path=db_path))
@@ -383,6 +422,7 @@ def start_bot(token, db_path):
     application.add_handler(c_tag)
     application.add_handler(c_animale)
     application.add_handler(c_global)
+    application.add_handler(c_frigo)
     application.add_handler(c_pl)
     application.add_handler(c_pokewinners)
     application.add_handler(c_predilette)
@@ -392,6 +432,7 @@ def start_bot(token, db_path):
     application.add_handler(c_lad)
     application.add_handler(c_cw)
     application.add_handler(c_calc)
+    application.add_handler(c_comandi)
     application.add_handler(c_uni_lad)
     application.add_handler(c_uni_pl)
     application.add_handler(c_cessi)
