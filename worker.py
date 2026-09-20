@@ -61,6 +61,25 @@ def insertResult(db_path, sd_link):
     return message
 
 
+def frigoInfo(frigo_nr, db_path):
+    conn = db.openDbConn(db_path)
+    frigo = db.getFrigoInfoFromNumber(conn, frigo_nr)
+    db.closeDbConn(conn)
+
+    if not frigo:
+        return "Non esiste nessuna frigo con questo numero"
+
+    message = "Frigo Nr <code>{}</code>\n\nPartecipanti:".format(frigo['progr'])
+    for p in [frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']]:
+        message = message + '\n{}'.format(p)
+    message = message + '\n' + joks.messForWinnerOnReg(frigo['winner'], frigo['pokewinner'])
+
+    if frigo['sd_replay']:
+        message = message + '\n\n{}'.format(frigo['sd_replay'])
+
+    return message
+
+
 def rank_all(db_path):
     c = db.openDbConn(db_path)
     players, wins, partecipate = db.getPlayerLeaderboard(c)
@@ -124,10 +143,20 @@ def rank_week(db_path):
     c = db.openDbConn(db_path)
     w = db.getActualWeek(c)
     players, vinte, partecipate = db.getPlayerLeaderboard(c, week=w)
-    message = 'Classifica Settimana <code>{}</code>\n\n'.format(w)
-    for i in range(len(players)):
-        message = message + "<code>{}</code>) {:<10} <code>{}</code>  [<code>{}</code>]\n".format(i + 1, players[i], vinte[i], partecipate[i])
     db.closeDbConn(c)
+
+    message = 'Classifica Settimana <code>{}</code>\n\n'.format(w)
+
+    rank_width = len(str(len(players)))
+    name_width = max((len(p) for p in players), default=0)
+    wins_width = max((len(str(v)) for v in vinte), default=1)
+    part_width = max((len(str(p)) for p in partecipate), default=1)
+
+    for i in range(len(players)):
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {wins:>{ww}}  [{part:>{pw}}]</code>\n".format(
+            rank=i + 1, name=players[i], wins=vinte[i], part=partecipate[i],
+            rw=rank_width, nw=name_width, ww=wins_width, pw=part_width
+        )
     return message
 
 
@@ -221,9 +250,9 @@ def svergitryersRanking(db_path):
 
     results.sort(key=lambda x: x[4], reverse=True)
 
-    message = 'Svergitentativi Ranking\n(frigo cessi winconati / frigo cessi spawnati, sverginate)\n\n'
+    message = 'Svergitentativi Ranking\n(frigo cessi winconati / frigo cessi spawnati — sverginate)\n\n'
     for i, (player, vinte, tentativi, cessi_spawnati, perc) in enumerate(results):
-        message = message + "<code>{}</code>) {:<10} <code>{:.1f}%</code> (<code>{}/{}</code>, <code>{}</code>)\n".format(
+        message = message + "<code>{}</code>) {:<10} <code>{:.1f}%</code> (<code>{}/{}</code> — <code>{}</code>)\n".format(
             i + 1, player, perc, tentativi, cessi_spawnati, vinte
         )
     return message
@@ -389,7 +418,7 @@ def playerCard(player, db_path):
     )
 
     if cessi_tentativi == 0:
-        message = message + 'Svergiconversione: n/d (e quando mai ci ha provato)\n'
+        message = message + 'Svergiconversione: n/d (e quando mai ci ha provato)\n\n'
     else:
         cessi_wr = cessi_vinte / cessi_tentativi * 100
         message = message + 'Svergiconversione: <code>{0:.1f}%</code>{1} (<code>{2}</code> su <code>{3}</code> tentativi)\n\n'.format(
