@@ -83,10 +83,19 @@ def frigoInfo(frigo_nr, db_path):
 def rank_all(db_path):
     c = db.openDbConn(db_path)
     players, wins, partecipate = db.getPlayerLeaderboard(c)
-    message = 'Classifica All Time\n\n'
-    for i in range(len(players)):
-        message = message + "<code>{}</code>) {}  <code>{}</code>\n".format(i + 1, players[i], wins[i])
     db.closeDbConn(c)
+
+    message = 'Classifica All Time\n\n'
+
+    rank_width = len(str(len(players)))
+    name_width = max((len(p) for p in players), default=0)
+    wins_width = max((len(str(w)) for w in wins), default=1)
+
+    for i in range(len(players)):
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}}  {wins:>{ww}}</code>\n".format(
+            rank=i + 1, name=players[i], wins=wins[i],
+            rw=rank_width, nw=name_width, ww=wins_width
+        )
     return message
 
 
@@ -103,9 +112,19 @@ def rank_season(db_path):
                      }
         players_dict_arr.append(player_dict)
     ordinati = sorted(players_dict_arr, key=lambda x: x["5-1"], reverse=True)
+
+    rank_width = len(str(len(ordinati)))
+    name_width = max((len(o['player']) for o in ordinati), default=0)
+    score_width = max((len(str(o['5-1'])) for o in ordinati), default=1)
+    wins_width = max((len(str(o['wins'])) for o in ordinati), default=1)
+    part_width = max((len(str(o['part'])) for o in ordinati), default=1)
+
     for i in range(len(ordinati)):
-        message = message + "<code>{}</code>) {:<10} <code>{}</code>  [<code>{}</code>/<code>{}</code>]\n".format(i + 1, ordinati[i]['player'], ordinati[i]['5-1'],
-                                                              ordinati[i]['wins'], ordinati[i]['part'])
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {score:>{sw}}  [{wins:>{ww}}/{part:>{pw}}]</code>\n".format(
+            rank=i + 1, name=ordinati[i]['player'], score=ordinati[i]['5-1'],
+            wins=ordinati[i]['wins'], part=ordinati[i]['part'],
+            rw=rank_width, nw=name_width, sw=score_width, ww=wins_width, pw=part_width
+        )
 
     message = message + '\nF counter: <code>{}</code>\n'.format(sum(wins))
     message = message + "Metodo Calcolo: 5-1\n"
@@ -187,10 +206,19 @@ def global_score(path):
 
     partecipate_ord = list(partecipate_ord)
     scores_ord = list(scores_ord)
+
+    rank_width = len(str(len(players_ord)))
+    name_width = max((len(p) for p in players_ord), default=0)
+    score_width = max((len(str(s)) for s in scores_ord), default=1)
+    wins_width = max((len(str(v)) for v in vinte_ord), default=1)
+    part_width = max((len(str(p)) for p in partecipate_ord), default=1)
+
     for i in range(len(players)):
-        message = message + "\n<code>{}</code>) {}: ".format(i + 1, players_ord[i])
-        message = message + "<code>{}</code> ".format(scores_ord[i])
-        message = message + "[<code>{}</code>/<code>{}</code>]".format(vinte_ord[i], partecipate_ord[i])
+        message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {score:>{sw}}  [{wins:>{ww}}/{part:>{pw}}]</code>".format(
+            rank=i + 1, name=players_ord[i], score=scores_ord[i],
+            wins=vinte_ord[i], part=partecipate_ord[i],
+            rw=rank_width, nw=name_width, sw=score_width, ww=wins_width, pw=part_width
+        )
 
     return message
 
@@ -209,9 +237,15 @@ def swingRanking(db_path):
     results.sort(key=lambda x: x[1]['score'], reverse=True)
 
     message = 'SwingScore Ranking\n(EWR: estimated win rate)\n\n'
+
+    rank_width = len(str(len(results)))
+    name_width = max((len(player) for player, _ in results), default=0)
+    score_width = max((len(str(swing['score'])) for _, swing in results), default=1)
+
     for i, (player, swing) in enumerate(results):
-        message = message + "<code>{}</code>) {:<10} <code>{}</code>  (EWR <code>{:.1f}%</code> ± <code>{:.1f}</code>)\n".format(
-            i + 1, player, swing['score'], swing['mean_wr'], swing['true_stdev']
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {score:>{sw}}  (EWR {mean:.1f}% ± {std:.1f})</code>\n".format(
+            rank=i + 1, name=player, score=swing['score'], mean=swing['mean_wr'], std=swing['true_stdev'],
+            rw=rank_width, nw=name_width, sw=score_width
         )
     return message
 
@@ -230,9 +264,17 @@ def svergiconvertersRanking(db_path):
     results.sort(key=lambda x: x[3], reverse=True)
 
     message = 'Svergiconversione Ranking\n(sverginate / frigo cessi winconati, frigo giocate)\n\n'
+
+    rank_width = len(str(len(results)))
+    name_width = max((len(player) for player, _, _, _, _ in results), default=0)
+    vinte_width = max((len(str(vinte)) for _, vinte, _, _, _ in results), default=1)
+    tentativi_width = max((len(str(tentativi)) for _, _, tentativi, _, _ in results), default=1)
+    giocate_width = max((len(str(giocate)) for _, _, _, _, giocate in results), default=1)
+
     for i, (player, vinte, tentativi, perc, giocate) in enumerate(results):
-        message = message + "<code>{}</code>) {:<10} <code>{:.1f}%</code> (<code>{}</code>/<code>{}</code> su <code>{}</code>)\n".format(
-            i + 1, player, perc, vinte, tentativi, giocate
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>5.1f}% ({vinte:>{vw}}/{tentativi:>{tw}} su {giocate:>{gw}})</code>\n".format(
+            rank=i + 1, name=player, perc=perc, vinte=vinte, tentativi=tentativi, giocate=giocate,
+            rw=rank_width, nw=name_width, vw=vinte_width, tw=tentativi_width, gw=giocate_width
         )
     return message
 
@@ -251,9 +293,17 @@ def svergitryersRanking(db_path):
     results.sort(key=lambda x: x[4], reverse=True)
 
     message = 'Svergitentativi Ranking\n(frigo cessi winconati / frigo cessi spawnati — sverginate)\n\n'
+
+    rank_width = len(str(len(results)))
+    name_width = max((len(player) for player, _, _, _, _ in results), default=0)
+    tentativi_width = max((len(str(tentativi)) for _, _, tentativi, _, _ in results), default=1)
+    spawnati_width = max((len(str(cs)) for _, _, _, cs, _ in results), default=1)
+    vinte_width = max((len(str(vinte)) for _, vinte, _, _, _ in results), default=1)
+
     for i, (player, vinte, tentativi, cessi_spawnati, perc) in enumerate(results):
-        message = message + "<code>{}</code>) {:<10} <code>{:.1f}%</code> (<code>{}/{}</code> — <code>{}</code>)\n".format(
-            i + 1, player, perc, tentativi, cessi_spawnati, vinte
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>5.1f}% ({tentativi:>{tw}}/{cs:>{cw}} — {vinte:>{vw}})</code>\n".format(
+            rank=i + 1, name=player, perc=perc, tentativi=tentativi, cs=cessi_spawnati, vinte=vinte,
+            rw=rank_width, nw=name_width, tw=tentativi_width, cw=spawnati_width, vw=vinte_width
         )
     return message
 
@@ -281,7 +331,7 @@ def wins_animale(animale, path):
 
     spawns_count, wins_count = db.getSpawnsWithWinsOfPokemon(conn, top_similar)
     wincon_count = db.getWinconCountForPokemon(conn, top_similar)
-    wincon_message = '\nWinconato <code>{}</code> volte'.format(wincon_count)
+    wincon_message = '\n\nWinconato <code>{}</code> volte'.format(wincon_count)
     affettiva_player, affettiva_wincon_cnt, affettiva_spawn_cnt = db.getTopWinconizerForMon(conn, top_similar)
     prediletta_player, prediletta_wincon_cnt, prediletta_spawn_cnt = db.getMostFrequentWinconizerForMon(conn, top_similar)
 
@@ -520,10 +570,16 @@ def predilette(player, db_path, limit=10):
         return "{} non ha mai winconato nulla, scarsismo".format(top_similar)
 
     message = "<b>{}</b> - Top {} wincon predilette (per numero di volte):\n".format(top_similar, len(top))
+
+    rank_width = len(str(len(top)))
+    name_width = max((len(mon) for mon, _, _ in top), default=0)
+    cnt_width = max((len(str(wincon_cnt)) for _, wincon_cnt, _ in top), default=1)
+
     for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top):
         wr = wincon_cnt / spawn_cnt * 100
-        message = message + "\n<code>{}</code>) {}: <code>{}</code> (<code>{:.0f}%</code>)".format(
-            i + 1, mon, wincon_cnt, wr
+        message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {cnt:>{cw}} ({wr:>3.0f}%)</code>".format(
+            rank=i + 1, name=mon, cnt=wincon_cnt, wr=wr,
+            rw=rank_width, nw=name_width, cw=cnt_width
         )
     return message
 
@@ -550,10 +606,17 @@ def affettive(player, db_path, limit=10):
         return "{} non ha mai winconato nulla, scarsismo".format(top_similar)
 
     message = "<b>{}</b> - Top {} wincon affettive (per percentuale):\n".format(top_similar, len(top))
+
+    rank_width = len(str(len(top)))
+    name_width = max((len(mon) for mon, _, _ in top), default=0)
+    cnt_width = max((len(str(wincon_cnt)) for _, wincon_cnt, _ in top), default=1)
+    spawn_width = max((len(str(spawn_cnt)) for _, _, spawn_cnt in top), default=1)
+
     for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top):
         wr = wincon_cnt / spawn_cnt * 100
-        message = message + "\n<code>{}</code>) {}: <code>{:.0f}%</code> (<code>{}</code>/<code>{}</code>)".format(
-            i + 1, mon, wr, wincon_cnt, spawn_cnt
+        message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {wr:>3.0f}% ({cnt:>{cw}}/{spawn:>{sw}})</code>".format(
+            rank=i + 1, name=mon, wr=wr, cnt=wincon_cnt, spawn=spawn_cnt,
+            rw=rank_width, nw=name_width, cw=cnt_width, sw=spawn_width
         )
     return message
 
@@ -718,11 +781,20 @@ def LadderUnici(db_path):
     c = db.openDbConn(db_path)
 
     players, unici = db.UnicumLadder(c)
-    message = 'Wins con animali unici (<code>{}</code>)\n'.format(sum(unici))
-    for i in range(len(players)):
-        message = message + '\n<code>{}</code>) {} <code>{}</code>'.format(i + 1, players[i], unici[i])
-
     db.closeDbConn(c)
+
+    message = 'Wins con animali unici (<code>{}</code>)\n'.format(sum(unici))
+
+    rank_width = len(str(len(players)))
+    name_width = max((len(p) for p in players), default=0)
+    unici_width = max((len(str(u)) for u in unici), default=1)
+
+    for i in range(len(players)):
+        message = message + '\n<code>{rank:>{rw}}) {name:<{nw}} {unici:>{uw}}</code>'.format(
+            rank=i + 1, name=players[i], unici=unici[i],
+            rw=rank_width, nw=name_width, uw=unici_width
+        )
+
     return message
 
 
@@ -743,9 +815,10 @@ def UniciPlayer(player, db_path):
 
     animali, wins = db.getUnicumByPlayer(c, top_similar)
     message = 'Unici di {}: <code>{}</code>\n\n'.format(top_similar, len(animali))
-    for i in range(len(animali)):
-        add_on = '{} (<code>{}</code>), '.format(animali[i], wins[i]) if wins[i] > 1 else '{}, '.format(animali[i])
-        message = message + add_on
+    message = message + ', '.join(
+        '{} (<code>{}</code>)'.format(animali[i], wins[i]) if wins[i] > 1 else animali[i]
+        for i in range(len(animali))
+    )
 
     db.closeDbConn(c)
     return message
@@ -766,10 +839,17 @@ def WinrateAnimali(db_path):
     animali, spawns, wins = db.getPokemonWinsPerSpawns(c)
     message = 'Classifica animali per winrate (campione di <code>{}</code> f)\n'.format(sum(wins))
 
-    for i in range(10):
-        message = message + "\n<code>{}</code>) {} : ".format(i + 1, animali[i])
-        message = message + '<code>{0:.2f}%</code> '.format(wins[i] * 100 / spawns[i])
-        message = message + ' [<code>{}</code>/<code>{}</code>]'.format(wins[i], spawns[i])
+    top10 = list(range(10))
+    name_width = max((len(animali[i]) for i in top10), default=0)
+    wins_width = max((len(str(wins[i])) for i in top10), default=1)
+    spawns_width = max((len(str(spawns[i])) for i in top10), default=1)
+
+    for i in top10:
+        wr = wins[i] * 100 / spawns[i]
+        message = message + "\n<code>{rank:>2}) {name:<{nw}} {wr:>6.2f}%  [{wins:>{ww}}/{spawns:>{sw}}]</code>".format(
+            rank=i + 1, name=animali[i], wr=wr, wins=wins[i], spawns=spawns[i],
+            nw=name_width, ww=wins_width, sw=spawns_width
+        )
     db.closeDbConn(c)
     message = message + '\n\nN.B. Vari Arceus esclusi dal calcolo'
     return message
@@ -781,9 +861,16 @@ def desaparecidos(db_path, limit=10):
     db.closeDbConn(c)
 
     message = 'Animali scomparsi da più tempo\n'
+
+    rank_width = len(str(len(mons)))
+    name_width = max((len(m) for m in mons), default=0)
+
     for i in range(len(mons)):
-        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else '<code>{}</code>'.format(since[i])
-        message = message + "\n<code>{}</code>) {} : {}".format(i + 1, mons[i], spawn_message)
+        spawn_message = 'apparso nell\'ultima frigo giocata' if since[i] == 0 else str(since[i])
+        message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} : {spawn}</code>".format(
+            rank=i + 1, name=mons[i], spawn=spawn_message,
+            rw=rank_width, nw=name_width
+        )
     return message
 
 
@@ -793,9 +880,17 @@ def topWincons(db_path, limit=10):
     db.closeDbConn(c)
 
     message = 'Top {} animali più winconati\n'.format(limit)
+
+    rank_width = len(str(len(top)))
+    name_width = max((len(mon) for mon, _, _ in top), default=0)
+    cnt_width = max((len(str(wincon_cnt)) for _, wincon_cnt, _ in top), default=1)
+
     for i, (mon, wincon_cnt, wins) in enumerate(top):
         wr = wins / wincon_cnt * 100
-        message = message + "\n<code>{}</code>) {}: <code>{}</code> (<code>{:.0f}%</code>)".format(i + 1, mon, wincon_cnt, wr)
+        message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {cnt:>{cw}} ({wr:>3.0f}%)</code>".format(
+            rank=i + 1, name=mon, cnt=wincon_cnt, wr=wr,
+            rw=rank_width, nw=name_width, cw=cnt_width
+        )
     return message
 
 
@@ -804,10 +899,15 @@ def calippi(db_path):
     califfi = db.getCaliffi(c)
     message = "Albo d'oro califfi\n\n"
 
-    pos = 1
-    for k in califfi:
-        mess_cond = "(cond <code>{}</code>)".format(k[1]['califfi_cond']) if k[1]['califfi_cond'] > 0 else ''
-        message = message + '<code>{}</code>) {} <code>{}</code> {}\n'.format(pos, k[0], k[1]['califfi'], mess_cond)
-        pos += 1
+    rank_width = len(str(len(califfi)))
+    name_width = max((len(k[0]) for k in califfi), default=0)
+    cnt_width = max((len(str(k[1]['califfi'])) for k in califfi), default=1)
+
+    for i, k in enumerate(califfi):
+        mess_cond = "(cond {})".format(k[1]['califfi_cond']) if k[1]['califfi_cond'] > 0 else ''
+        message = message + '<code>{rank:>{rw}}) {name:<{nw}} {cnt:>{cw}}</code> {cond}\n'.format(
+            rank=i + 1, name=k[0], cnt=k[1]['califfi'], cond=mess_cond,
+            rw=rank_width, nw=name_width, cw=cnt_width
+        )
     db.closeDbConn(c)
     return message

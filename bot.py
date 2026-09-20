@@ -13,16 +13,6 @@ import worker
 
 SUPER_USERS = [170532946]
 
-RESTRICTED_COMMANDS = {"query", "tag", "closeweek"}
-
-ALL_COMMANDS = [
-    "week", "animali", "animali2", "season", "siso", "califfi", "score", "animale",
-    "global", "query", "tag", "player", "pokewinners", "predilette", "affettive",
-    "secchezza", "andazzo", "ladder", "closeweek", "calc", "unicums", "unicum",
-    "cessi", "desaparecidos", "swingers", "wincons", "svergiconverters",
-    "svergitryers", "comandi", "frigo",
-]
-
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = worker.insertResult(path, update.message.text)
     if message:
@@ -269,9 +259,50 @@ async def ladder_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
     return
 
 
+COMMAND_SECTIONS = [
+    ("📊 Classifiche", [
+        ("week", "classifica settimana in corso"),
+        ("global", "classifica all time"),
+        ("season / siso", "classifica stagione in corso"),
+        ("score", "classifica per punteggio MarvWr"),
+        ("califfi", "albo d'oro califfi"),
+        ("swingers", "giocatori più altalenanti di settimana in settimana"),
+    ]),
+    ("🐽 Animali", [
+        ("animali", "classifica animali per vittorie"),
+        ("animali2", "classifica animali per winrate"),
+        ("animale &lt;nome&gt;", "statistiche su un animale"),
+        ("wincons", "animali più winconati"),
+        ("cessi", "animali da sverginare"),
+        ("desaparecidos", "animali che non spawnano da più tempo"),
+        ("unicums", "classifica vittorie con animali unici"),
+        ("unicum &lt;nome&gt;", "animali unici sverginati da un giocatore"),
+        ("pokewinners &lt;nome&gt;", "animali con cui un giocatore trionfa di più"),
+    ]),
+    ("👤 Giocatori", [
+        ("player &lt;nome&gt;", "scheda giocatore"),
+        ("predilette &lt;nome&gt;", "wincon preferite (per numero)"),
+        ("affettive &lt;nome&gt;", "wincon preferite (per percentuale)"),
+        ("secchezza &lt;nome&gt;", "da quante frigo non vince"),
+        ("svergiconverters", "classifica conversione cessi winconati"),
+        ("svergitryers", "classifica tentativi su cessi spawnati"),
+    ]),
+    ("🧊 Altro", [
+        ("frigo &lt;numero&gt;", "dettagli di una frigo specifica"),
+        ("andazzo", "grafico frigo giocate per settimana"),
+        ("calc", "link al damage calc di Showdown"),
+        ("ladder", "vedi tu"),
+        ("comandi", "vedi questa lista tipo?"),
+    ]),
+]
+
+
 async def comandi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    comandi = sorted(c for c in ALL_COMMANDS if c not in RESTRICTED_COMMANDS)
-    message = "Ecco i comandi che puoi usare:\n\n" + "\n".join(f"/{c}" for c in comandi)
+    sections = []
+    for title, commands in COMMAND_SECTIONS:
+        lines = "\n".join(f"<code>/{cmd}</code> - {desc}" for cmd, desc in commands)
+        sections.append(f"<b>{title}</b>\n{lines}")
+    message = "Ecco i comandi che puoi usare:\n\n" + "\n\n".join(sections)
     await update.message.reply_text(
         message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
