@@ -1,11 +1,20 @@
 from datetime import datetime
 import difflib
 import graph
-import statistics
 import db
 import joks
 import logics
 import replay_reader
+
+MAX_RANKING_NAME_WIDTH = 10
+
+
+def _capped_name_width(names):
+    return min(max((len(n) for n in names), default=0), MAX_RANKING_NAME_WIDTH)
+
+
+def _truncate_name(name, width):
+    return name if len(name) <= width else name[:width]
 
 
 def insertResult(db_path, sd_link):
@@ -236,15 +245,15 @@ def swingRanking(db_path):
 
     results.sort(key=lambda x: x[1]['score'], reverse=True)
 
-    message = 'SwingScore Ranking\n(EWR: estimated win rate)\n\n'
+    message = 'SwingScore Ranking\n(win rate stimato con intervallo di confidenza)\n\n'
 
     rank_width = len(str(len(results)))
-    name_width = max((len(player) for player, _ in results), default=0)
+    name_width = _capped_name_width(player for player, _ in results)
     score_width = max((len(str(swing['score'])) for _, swing in results), default=1)
 
     for i, (player, swing) in enumerate(results):
-        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {score:>{sw}}  (EWR {mean:.1f}% ± {std:.1f})</code>\n".format(
-            rank=i + 1, name=player, score=swing['score'], mean=swing['mean_wr'], std=swing['true_stdev'],
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {score:>{sw}} ({mean:.0f}%±{std:.0f})</code>\n".format(
+            rank=i + 1, name=_truncate_name(player, name_width), score=swing['score'], mean=swing['mean_wr'], std=swing['true_stdev'],
             rw=rank_width, nw=name_width, sw=score_width
         )
     return message
@@ -266,15 +275,15 @@ def svergiconvertersRanking(db_path):
     message = 'Svergiconversione Ranking\n(sverginate / frigo cessi winconati, frigo giocate)\n\n'
 
     rank_width = len(str(len(results)))
-    name_width = max((len(player) for player, _, _, _, _ in results), default=0)
+    name_width = _capped_name_width(player for player, _, _, _, _ in results)
     vinte_width = max((len(str(vinte)) for _, vinte, _, _, _ in results), default=1)
     tentativi_width = max((len(str(tentativi)) for _, _, tentativi, _, _ in results), default=1)
     giocate_width = max((len(str(giocate)) for _, _, _, _, giocate in results), default=1)
 
     for i, (player, vinte, tentativi, perc, giocate) in enumerate(results):
-        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>5.1f}% ({vinte:>{vw}}/{tentativi:>{tw}} su {giocate:>{gw}})</code>\n".format(
-            rank=i + 1, name=player, perc=perc, vinte=vinte, tentativi=tentativi, giocate=giocate,
-            rw=rank_width, nw=name_width, vw=vinte_width, tw=tentativi_width, gw=giocate_width
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>{pw}.0f}% ({vinte:>{vw}}/{tentativi:>{tw}}/{giocate:>{gw}})</code>\n".format(
+            rank=i + 1, name=_truncate_name(player, name_width), perc=perc, vinte=vinte, tentativi=tentativi, giocate=giocate,
+            rw=rank_width, nw=name_width, pw=3, vw=vinte_width, tw=tentativi_width, gw=giocate_width
         )
     return message
 
@@ -295,15 +304,15 @@ def svergitryersRanking(db_path):
     message = 'Svergitentativi Ranking\n(frigo cessi winconati / frigo cessi spawnati — sverginate)\n\n'
 
     rank_width = len(str(len(results)))
-    name_width = max((len(player) for player, _, _, _, _ in results), default=0)
+    name_width = _capped_name_width(player for player, _, _, _, _ in results)
     tentativi_width = max((len(str(tentativi)) for _, _, tentativi, _, _ in results), default=1)
     spawnati_width = max((len(str(cs)) for _, _, _, cs, _ in results), default=1)
     vinte_width = max((len(str(vinte)) for _, vinte, _, _, _ in results), default=1)
 
     for i, (player, vinte, tentativi, cessi_spawnati, perc) in enumerate(results):
-        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>5.1f}% ({tentativi:>{tw}}/{cs:>{cw}} — {vinte:>{vw}})</code>\n".format(
-            rank=i + 1, name=player, perc=perc, tentativi=tentativi, cs=cessi_spawnati, vinte=vinte,
-            rw=rank_width, nw=name_width, tw=tentativi_width, cw=spawnati_width, vw=vinte_width
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>{pw}.0f}% ({tentativi:>{tw}}/{cs:>{cw}}/{vinte:>{vw}})</code>\n".format(
+            rank=i + 1, name=_truncate_name(player, name_width), perc=perc, tentativi=tentativi, cs=cessi_spawnati, vinte=vinte,
+            rw=rank_width, nw=name_width, pw=3, tw=tentativi_width, cw=spawnati_width, vw=vinte_width
         )
     return message
 

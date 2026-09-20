@@ -6,12 +6,15 @@ from telegram.ext import (
     CommandHandler,
     filters,
 )
+from dotenv import load_dotenv
 from functools import partial
+import os
 import time
 
 import worker
 
-SUPER_USERS = [170532946]
+load_dotenv()
+SUPER_USERS = [int(uid) for uid in os.environ.get('SUPER_USERS', '').split(',') if uid.strip()]
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = worker.insertResult(path, update.message.text)
@@ -302,7 +305,7 @@ async def comandi_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for title, commands in COMMAND_SECTIONS:
         lines = "\n".join(f"<code>/{cmd}</code> - {desc}" for cmd, desc in commands)
         sections.append(f"<b>{title}</b>\n{lines}")
-    message = "Ecco i comandi che puoi usare:\n\n" + "\n\n".join(sections)
+    message = "Comandi!\n\n" + "\n\n".join(sections)
     await update.message.reply_text(
         message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
