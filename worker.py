@@ -76,11 +76,16 @@ def frigoInfo(frigo_nr, db_path):
     db.closeDbConn(conn)
 
     if not frigo:
-        return "Non esiste nessuna frigo con questo numero"
+        return "Se magari mi dessi una frigo non inventata"
+
+    players = [frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']]
 
     message = "Frigo Nr <code>{}</code>\n\nPartecipanti:".format(frigo['progr'])
-    for p in [frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']]:
-        message = message + '\n{}'.format(p)
+    for p in players:
+        if p:
+            message = message + '\n{}'.format(p)
+    if any(p is None for p in players):
+        message = message + '\n\n(frigo dell\'età della pietra, dati parziali)'
     message = message + '\n' + joks.messForWinnerOnReg(frigo['winner'], frigo['pokewinner'])
 
     if frigo['sd_replay']:
