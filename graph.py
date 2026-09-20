@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import make_interp_spline
 
-import pandas as pd
-from pandas.plotting import table
+import polars as pl
 def save_hist(x, y, path):
     x_np = np.array(x)
     y_np = np.array(y)
@@ -29,19 +28,19 @@ def save_hist(x, y, path):
 def ladderTable(p,r,rd, path):
     rating=[int(rt)for rt in r]
     rds=[int(rt)for rt in rd]
-    df=pd.DataFrame({
+    df=pl.DataFrame({
         'Frigante':p,
         'Rating':rating,
         'RD':rds
     })
 
-    df=df.sort_values(by='Rating', ascending=False)
-    df.insert(0,'Pos',range(1,len(df)+1))
+    df=df.sort('Rating', descending=True)
+    df=df.with_columns(pl.Series('Pos',range(1,len(df)+1))).select(['Pos','Frigante','Rating','RD'])
 
     fig,ax=plt.subplots(figsize=(8,4))
 
     ax.axis('off')
-    tbl=table(ax,df,loc='center',cellLoc='center',colWidths=[0.1]*len(df.columns))
+    tbl=ax.table(cellText=df.rows(),colLabels=df.columns,loc='center',cellLoc='center',colWidths=[0.1]*len(df.columns))
 
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(12)

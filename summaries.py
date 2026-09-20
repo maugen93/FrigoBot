@@ -1,8 +1,7 @@
 import os
 
 import db
-import pandas as pd
-import numpy as np
+import polars as pl
 from fpdf import FPDF
 
 from dotenv import load_dotenv
@@ -18,20 +17,22 @@ def elabSummeries(db_path, from_f, to_f):
     f_dict={'Player1':players1,'Player2':players2,'Player3':players3,'Player4':players4,
             'Winner':winners,'PokeWinner':pokewinners}
 
-    f=pd.DataFrame(f_dict)
+    f=pl.DataFrame(f_dict)
 
-    vinte=f.groupby('Winner').size().reset_index(name='Vinte')
+    vinte=f.group_by('Winner').len().rename({'Winner':'Player','len':'Vinte'})
 
-    giocate=pd.DataFrame({'Player':players1+players2+players3+players4}).groupby('Player')\
-        .size().reset_index(name='Giocate')
+    giocate=pl.DataFrame({'Player':players1+players2+players3+players4}).group_by('Player')\
+        .len().rename({'len':'Giocate'})
 
-    new_f=pd.merge(giocate,vinte,left_on='Player',right_on='Winner',how='left').drop('Winner',axis=1)
-    new_f['Vinte']=new_f['Vinte'].fillna(0).astype(int)
-    new_f['Winrate']=(new_f['Vinte']*100/new_f['Giocate']).__round__(2)
-    new_f['Winrate_Pond']=((new_f['Vinte']*np.log(new_f['Giocate'])/new_f['Giocate'])*1000).astype(int)
-    new_f['Punteggio4-1']=new_f['Vinte']*4-(new_f['Giocate']-new_f['Vinte'])
-    new_f['Punteggio5-1'] = new_f['Vinte'] * 5 - (new_f['Giocate'] - new_f['Vinte'])
-    new_f.to_csv(r'stats_tashino.csv',sep=';',decimal=',')
+    new_f=giocate.join(vinte,on='Player',how='left')
+    new_f=new_f.with_columns(pl.col('Vinte').fill_null(0).cast(pl.Int64))
+    new_f=new_f.with_columns([
+        (pl.col('Vinte')*100/pl.col('Giocate')).round(2).alias('Winrate'),
+        ((pl.col('Vinte')*pl.col('Giocate').log()/pl.col('Giocate'))*1000).cast(pl.Int64).alias('Winrate_Pond'),
+        (pl.col('Vinte')*4-(pl.col('Giocate')-pl.col('Vinte'))).alias('Punteggio4-1'),
+        (pl.col('Vinte')*5-(pl.col('Giocate')-pl.col('Vinte'))).alias('Punteggio5-1'),
+    ])
+    new_f.write_csv('stats_tashino.csv',separator=';',decimal_comma=True)
     print(new_f)
     db.closeDbConn(c)
 
