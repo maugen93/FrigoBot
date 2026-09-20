@@ -859,6 +859,15 @@ def getSinceHowManyFrigosSpawn(conn, pokemon):
     return 10000
 
 
+def getLastFrigoWonByMon(conn, pokemon):
+    '''Numero dell\'ultima frigo (frigos.progr più alto) vinta con questo
+    animale come pokewinner, o None se non ha mai vinto.'''
+    cur = conn.cursor()
+    cur.execute("SELECT MAX(progr) FROM frigos WHERE pokewinner=?", (pokemon,))
+    result = cur.fetchone()
+    return result[0] if result else None
+
+
 def getWinconCountForPokemon(conn, pokemon):
     '''Quante volte questo animale è stato l'ultimo pokemon in campo (wincon,
     colonna spawns.winconato) per il suo giocatore, indipendentemente dal

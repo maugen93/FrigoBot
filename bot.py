@@ -87,7 +87,7 @@ async def closeweek_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user = update.message.from_user
     if user.id not in SUPER_USERS:
         await update.message.reply_text(
-            'Ti piacerebbe, porco', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+            'Che è, ti vuoi cheattare il califfo?', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
         )
         return
     message = worker.closeWeek(path)
@@ -161,12 +161,14 @@ async def frigo_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path
     cmds = command.split(' ')
     if len(cmds) > 1:
         arg = command.replace("/frigo ", '').strip()
-        if not arg.isdigit():
-            await update.message.reply_text(
-                'e dammi un numero', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
-            )
-            return
-        message = worker.frigoInfo(int(arg), path)
+        if arg.lower() == 'random':
+            message = worker.frigoInfoRandom(path)
+        elif arg.lower() in ('last', 'ultima'):
+            message = worker.frigoInfoLast(path)
+        elif arg.isdigit():
+            message = worker.frigoInfo(int(arg), path)
+        else:
+            message = worker.frigoInfoForMon(arg, path)
         await update.message.reply_text(
             message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
         )
@@ -395,7 +397,6 @@ async def svergitryers_command(update: Update, context: ContextTypes.DEFAULT_TYP
 def start_bot(token, db_path):
     application = Application.builder().token(token).build()
 
-    # Aggiungo gestori comandi
     m = MessageHandler(filters.Regex("(?=.*replay)(?=.*pokemonshowdown)(?=.*freeforallrandombattle)"),
                        partial(handle_message, path=db_path))
 

@@ -1,5 +1,7 @@
 from datetime import datetime
 import difflib
+import html
+import random
 import graph
 import db
 import joks
@@ -80,18 +82,70 @@ def frigoInfo(frigo_nr, db_path):
 
     players = [frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']]
 
-    message = "Frigo Nr <code>{}</code>\n\nPartecipanti:".format(frigo['progr'])
+    message = "Frigo # <code>{}</code>".format(frigo['progr'])
     for p in players:
         if p:
             message = message + '\n{}'.format(p)
     if any(p is None for p in players):
-        message = message + '\n\n(frigo dell\'età della pietra, dati parziali)'
+        message = message + '\n\n(frigo dell\'età della pietra, dati parziali)\n'
     message = message + '\n' + joks.messForWinnerOnReg(frigo['winner'], frigo['pokewinner'])
 
     if frigo['sd_replay']:
-        message = message + '\n\n{}'.format(frigo['sd_replay'])
+
+        message = message + '\n\n<a href="{}">&lt;clicca-qui-per-il-replay&gt;</a>'.format(html.escape(frigo['sd_replay'], quote=True))
 
     return message
+
+
+def frigoInfoRandom(db_path):
+    conn = db.openDbConn(db_path)
+    max_frigo = db.getNumberOfFrigos(conn)
+    db.closeDbConn(conn)
+
+    if not max_frigo:
+        return "Se magari mi dessi una frigo non inventata"
+
+    return frigoInfo(random.randint(1, max_frigo), db_path)
+
+
+def frigoInfoLast(db_path):
+    conn = db.openDbConn(db_path)
+    max_frigo = db.getNumberOfFrigos(conn)
+    db.closeDbConn(conn)
+
+    if not max_frigo:
+        return "Se magari mi dessi una frigo non inventata"
+
+    return frigoInfo(max_frigo, db_path)
+
+
+def frigoInfoForMon(animale, db_path):
+    conn = db.openDbConn(db_path)
+    mons = db.getAllMons(conn)
+    top_similar = None
+    top_similitude = 0
+    for m in mons:
+        seq = difflib.SequenceMatcher(a=animale.lower(), b=m.lower())
+        if seq.ratio() > 0.7 and seq.ratio() > top_similitude:
+            top_similar = m
+            top_similitude = seq.ratio()
+
+    if not top_similar:
+        db.closeDbConn(conn)
+        return "non mi risulta che qualcosa chiamato {} abbia mai solcato i palchi".format(animale)
+
+    _, wins = db.getWinsPkmn(conn, top_similar)
+    if not wins:
+        db.closeDbConn(conn)
+        return "che frigo vuoi vedere che è ancora un cesso"
+
+    last_frigo_nr = db.getLastFrigoWonByMon(conn, top_similar)
+    db.closeDbConn(conn)
+
+    if not last_frigo_nr:
+        return "che frigo vuoi vedere che è ancora un cesso"
+
+    return frigoInfo(last_frigo_nr, db_path)
 
 
 def rank_all(db_path):
@@ -687,7 +741,7 @@ def frigoFrequency(db_path):
     conn = db.openDbConn(db_path)
     w, f = db.getNumberOfFrigoPerWeek(conn)
     db.closeDbConn(conn)
-    save_path = r'C:\Users\mgent\Desktop\SVIL PERSONALE\FrigoBot\frequenza.png'
+    save_path = r'frequenza.png'
     graph.save_hist(w, f, save_path)
     db.closeDbConn(conn)
     return save_path
@@ -751,23 +805,23 @@ def closeWeek(db_path):
         if score_diff < min_increment:
             min_increment = score_diff
             who_not_smile = players[i]
-    message = '🔴Chiusa settimana <code>{}</code>\n\n'.format(actual_w)
-    message = message + '👳Califfa {} con <code>{}</code> vittorie\n\n'.format(calippo, vinte[0])
-    message = message + '🐖Porco di settimana: {} (<code>{}</code> su <code>{}</code>)\n'.format(most_pig, vinte[players.index(most_pig)],
+    message = '🔴 Chiusa settimana <code>{}</code>\n\n'.format(actual_w)
+    message = message + '👳 Califfa {} con <code>{}</code> vittorie\n\n'.format(calippo, vinte[0])
+    message = message + '🐖 Porco di settimana: {} (<code>{}</code> su <code>{}</code>)\n'.format(most_pig, vinte[players.index(most_pig)],
                                                                       partecipate[players.index(most_pig)])
-    message = message + '🤏Il più rachitico: {} (<code>{}</code> su <code>{}</code>)\n\n'.format(most_thin, vinte[players.index(most_thin)],
+    message = message + '🤏 Il più rachitico: {} (<code>{}</code> su <code>{}</code>)\n\n'.format(most_thin, vinte[players.index(most_thin)],
                                                                       partecipate[players.index(most_thin)])
-    message = message + '😆E in tutto ciò chi ride?\n'
+    message = message + '😆 E in tutto ciò chi ride?\n'
     message = message + '¬ Di certo non {} (<code>{}</code> MarvWr points)\n'.format(who_not_smile, min_increment)
     message = message + '¬ Tendenzialmente ride {} (+<code>{}</code> MarvWr points)\n\n'.format(who_smile, max_increment)
 
     if len(cessi) > 0:
-        message = message + '🔞Sono stati sverginati <code>{}</code> cessi, principalmente da {}\n\n'.format(
+        message = message + '🔞 Sono stati sverginati <code>{}</code> cessi, principalmente da {}\n\n'.format(
             len(list(set(cessi))), joks.str_sverg(sverginatori))
     else:
-        message = message + '🔞Nessun cesso è stato sverginato\n\n'
+        message = message + '🔞 Nessun cesso è stato sverginato\n\n'
 
-    message = message + '🧊La settimana è durata <code>{}</code> giorni e si è frigato per un ammontare complessivo di <code>{}</code> frigo, '.format(durata_giorni,sum(vinte))
+    message = message + '🧊 La settimana è durata <code>{}</code> giorni e si è frigato per un ammontare complessivo di <code>{}</code> frigo, '.format(durata_giorni,sum(vinte))
     f_per_day=sum(vinte)/durata_giorni
     message = message + 'per una media {} '.format(joks.commentoMedia(f_per_day))
     message = message + 'di <code>{0:.2f}</code> frigo al giorno\n\n'.format(f_per_day)
@@ -889,6 +943,9 @@ def desaparecidos(db_path, limit=10):
 
 
 def topWincons(db_path, limit=10):
+    if limit >= 50:
+        return 'Ma quanti cazzo ne vuoi'
+
     c = db.openDbConn(db_path)
     top = db.getTopWinconedMons(c, limit)
     db.closeDbConn(c)
