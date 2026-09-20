@@ -331,7 +331,7 @@ def wins_animale(animale, path):
 
     spawns_count, wins_count = db.getSpawnsWithWinsOfPokemon(conn, top_similar)
     wincon_count = db.getWinconCountForPokemon(conn, top_similar)
-    wincon_message = '\nWinconato <code>{}</code> volte'.format(wincon_count)
+    wincon_message = '\n\nWinconato <code>{}</code> volte'.format(wincon_count)
     affettiva_player, affettiva_wincon_cnt, affettiva_spawn_cnt = db.getTopWinconizerForMon(conn, top_similar)
     prediletta_player, prediletta_wincon_cnt, prediletta_spawn_cnt = db.getMostFrequentWinconizerForMon(conn, top_similar)
 
