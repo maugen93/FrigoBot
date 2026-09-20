@@ -10,15 +10,20 @@ Le frigo che hanno già almeno uno spawn con winconato=1 vengono saltate senza
 richiamare la rete (non serve rileggere un replay già elaborato).
 
 Uso:
-    uv run python backfill_winconato.py [--db PATH] [--limit N] [--frigo PROGR [PROGR ...]] [--dry-run]
+    uv run --with rich python backfill_winconato.py [--db PATH] [--limit N] [--frigo PROGR [PROGR ...]] [--dry-run]
 
     --limit N          elabora solo le prime N frigo da fare (per un test rapido)
     --frigo PROGR ...  elabora solo queste frigo (per numero progr); ignora --limit
                         e rilegge il replay anche se già marcata (utile per un test
                         puntuale su una o due frigo)
     --dry-run          non scrive sul db, stampa solo cosa farebbe
+
+Richiede il pacchetto "rich" (solo per la progress bar): passato al volo con
+--with, così non serve aggiungerlo alle dipendenze del progetto.
 """
 import argparse
+
+from rich.progress import Progress
 
 import db
 import replay_reader
@@ -70,19 +75,25 @@ def main():
     if args.limit and not args.frigo:
         da_fare = da_fare[:args.limit]
 
-    print('Frigo da elaborare: {}'.format(len(da_fare)))
-
     n_errori = 0
-    for progr, replay_link in da_fare:
-        try:
-            esiti = backfill_frigo(conn, progr, replay_link, dry_run=args.dry_run)
-        except Exception as e:
-            print('Frigo {}: ERRORE ({})'.format(progr, e))
-            n_errori += 1
-            continue
-        print('Frigo {}:'.format(progr))
-        for player, spawn, esito in esiti:
-            print('    {} -> {} [{}]'.format(player, spawn, esito))
+    with Progress() as progress:
+        task = progress.add_task('Backfill winconato...', total=len(da_fare))
+        for progr, replay_link in da_fare:
+            try:
+                esiti = backfill_frigo(conn, progr, replay_link, dry_run=args.dry_run)
+            except Exception as e:
+                print('Frigo {}: ERRORE ({})'.format(progr, e))
+                n_errori += 1
+                progress.advance(task)
+                continue
+            print('Frigo {}:'.format(progr))
+            for player, spawn, esito in esiti:
+                print('    {} -> {} [{}]'.format(player, spawn, esito))
+            progress.advance(task)
+
+    if not args.dry_run and len(da_fare) - n_errori > 0:
+        print('\nRicostruzione cache statistiche (svergiconverters/svergitryers/swingscore)...')
+        db.rebuildStatsCache(conn)
 
     db.closeDbConn(conn)
     print('\nCompletate: {}/{} (errori: {})'.format(len(da_fare) - n_errori, len(da_fare), n_errori))
@@ -90,3 +101,11 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# 486 ogerpon-gate
+# 916 oinkologne-gate
+# 1334 tutti
+# Frigo 1532:
+# fraraga -> Magearna-Original-Mega [ATTENZIONE: nessuna riga spawns corrispondente]
+# Frigo 1759:
+# sergio -> Veluza [ATTENZIONE: nessuna riga spawns corrispondente]
