@@ -72,6 +72,43 @@ def insertResult(db_path, sd_link):
     return message
 
 
+def lastFrigoCancellationPreview(db_path):
+    '''Ritorna (progr, messaggio) con i dettagli dell'ultima frigo caricata, da
+    mostrare come richiesta di conferma prima di cancellarla. Ritorna (None,
+    messaggio) se non c'e' nessuna frigo da cancellare.'''
+    conn = db.openDbConn(db_path)
+    progr = db.getNumberOfFrigos(conn)
+    if not progr:
+        db.closeDbConn(conn)
+        return None, "Non c'è nessuna frigo da cancellare"
+
+    frigo = db.getFrigoInfoFromNumber(conn, progr)
+    db.closeDbConn(conn)
+
+    players = ', '.join(p for p in (frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']) if p)
+    message = (
+        "Sicuro di voler cancellare la Frigo Nr <code>{}</code>?\n"
+        "Partecipanti: {}\n"
+        "Vincitore: {} (con {})\n\n"
+        "Verranno rimossi anche tutti gli spawn e le statistiche legate a questa frigo."
+    ).format(progr, players, frigo['winner'], frigo['pokewinner'])
+    return progr, message
+
+
+def cancelLastFrigo(db_path, progr):
+    '''Cancella la frigo `progr` solo se e' ancora l'ultima caricata (evita di
+    cancellare la frigo sbagliata se nel frattempo ne e' stata inserita una
+    nuova mentre si aspettava la conferma). Ritorna None in quel caso.'''
+    conn = db.openDbConn(db_path)
+    if db.getNumberOfFrigos(conn) != progr:
+        db.closeDbConn(conn)
+        return None
+
+    db.deleteFrigo(conn, progr)
+    db.closeDbConn(conn)
+    return "Frigo Nr <code>{}</code> cancellata, con tutto quel che c'era sopra.".format(progr)
+
+
 def frigoInfo(frigo_nr, db_path):
     conn = db.openDbConn(db_path)
     frigo = db.getFrigoInfoFromNumber(conn, frigo_nr)
