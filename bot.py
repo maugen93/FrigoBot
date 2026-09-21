@@ -1,6 +1,8 @@
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import (
     Application,
+    ApplicationHandlerStop,
+    CallbackQueryHandler,
     ContextTypes,
     MessageHandler,
     CommandHandler,
@@ -16,7 +18,20 @@ import worker
 load_dotenv()
 SUPER_USERS = [int(uid) for uid in os.environ.get('SUPER_USERS', '').split(',') if uid.strip()]
 
+TROLL_USERNAME = os.environ.get('TROLL_USERNAME', '').lstrip('@').lower()
+TROLL_COOLDOWN_SECONDS = 30
+TROLL_BAN_SECONDS = 5 * 60
+
+# user_id -> unix timestamp of their last replay post
+_troll_last_replay = {}
+# user_id -> unix timestamp until which they are banned
+_troll_banned_until = {}
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    user = update.message.from_user
+    if user.username and user.username.lower() == TROLL_USERNAME:
+        _troll_last_replay[user.id] = time.time()
+
     message = worker.insertResult(path, update.message.text)
     if message:
         await update.message.reply_text(
@@ -25,6 +40,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
     time.sleep(5)
     await context.bot.send_message(update.message.chat_id, 'prossima')
     return
+
+
+async def troll_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not user or not user.username or user.username.lower() != TROLL_USERNAME:
+        # only the troll user is subject to this guard; everyone else is unaffected
+        return
+
+    now = time.time()
+
+    ban_until = _troll_banned_until.get(user.id)
+    if ban_until and now < ban_until:
+        raise ApplicationHandlerStop
+
+    last_replay = _troll_last_replay.get(user.id)
+    if last_replay and now - last_replay < TROLL_COOLDOWN_SECONDS:
+        await update.message.reply_text('no please stop')
+        await update.message.reply_text("actually I'll just ban you")
+        _troll_banned_until[user.id] = now + TROLL_BAN_SECONDS
+        raise ApplicationHandlerStop
 
 
 async def global_rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
@@ -94,6 +129,52 @@ async def closeweek_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await update.message.reply_text(
         message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
+    return
+
+
+async def clf_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    user = update.message.from_user
+    if user.id not in SUPER_USERS:
+        await update.message.reply_text(
+            'Ti piacerebbe, porco', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    progr, message = worker.lastFrigoCancellationPreview(path)
+    if progr is None:
+        await update.message.reply_text(message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove())
+        return
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Sì, cancella", callback_data="clf_confirm:{}".format(progr)),
+        InlineKeyboardButton("❌ No, lascia stare", callback_data="clf_cancel"),
+    ]])
+    await update.message.reply_text(message, parse_mode='HTML', reply_markup=keyboard)
+    return
+
+
+async def clf_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    query = update.callback_query
+    user = query.from_user
+    if user.id not in SUPER_USERS:
+        await query.answer('Ti piacerebbe, porco', show_alert=True)
+        return
+
+    if query.data == 'clf_cancel':
+        await query.answer()
+        await query.edit_message_text('Operazione annullata.', parse_mode='HTML')
+        return
+
+    progr = int(query.data.split(':', 1)[1])
+    message = worker.cancelLastFrigo(path, progr)
+    await query.answer()
+    if message is None:
+        await query.edit_message_text(
+            'Nel frattempo è cambiato qualcosa (nuova frigo caricata?), annullo per sicurezza.',
+            parse_mode='HTML'
+        )
+        return
+    await query.edit_message_text(message, parse_mode='HTML')
     return
 
 
@@ -426,6 +507,9 @@ def start_bot(token, db_path):
 
     c_cw = CommandHandler("closeweek", partial(closeweek_command, path=db_path))
 
+    c_clf = CommandHandler("clf", partial(clf_command, path=db_path))
+    cb_clf = CallbackQueryHandler(partial(clf_callback, path=db_path), pattern="^clf_")
+
     c_calc = CommandHandler("calc", send_link_calc)
 
     c_comandi = CommandHandler("comandi", comandi_command)
@@ -445,6 +529,8 @@ def start_bot(token, db_path):
 
     c_svergiconverters = CommandHandler("svergiconverters", partial(svergiconverters_command, path=db_path))
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
+
+    application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
     application.add_handler(m)
     application.add_handler(c_week)
@@ -466,6 +552,8 @@ def start_bot(token, db_path):
     application.add_handler(c_and)
     application.add_handler(c_lad)
     application.add_handler(c_cw)
+    application.add_handler(c_clf)
+    application.add_handler(cb_clf)
     application.add_handler(c_calc)
     application.add_handler(c_comandi)
     application.add_handler(c_uni_lad)

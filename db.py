@@ -116,6 +116,16 @@ def rebuildStatsCache(conn):
         updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner)
 
 
+def deleteFrigo(conn, progr):
+    '''Rimuove una frigo (e i suoi spawns) e ricostruisce la stats cache da zero,
+    cosi' mon_first_win/player_cesso_stats/player_weekly_stats tornano coerenti
+    senza dover invertire a mano gli incrementi fatti da updateStatsCacheForFrigo.'''
+    conn.execute("DELETE FROM spawns WHERE frigo=?", (progr,))
+    conn.execute("DELETE FROM frigos WHERE progr=?", (progr,))
+    conn.commit()
+    rebuildStatsCache(conn)
+
+
 def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link):
     conn.execute("INSERT INTO frigos (progr, week,data,player1,player2,player3,player4,winner,pokewinner,replay_link) "
                  "VALUES (?,?,?,?,?,?,?,?,?,?)",
