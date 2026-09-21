@@ -19,7 +19,7 @@ load_dotenv()
 SUPER_USERS = [int(uid) for uid in os.environ.get('SUPER_USERS', '').split(',') if uid.strip()]
 
 TROLL_USERNAME = os.environ.get('TROLL_USERNAME', '').lstrip('@').lower()
-TROLL_COOLDOWN_SECONDS = 30
+TROLL_COOLDOWN_SECONDS = 60
 TROLL_BAN_SECONDS = 5 * 60
 
 # user_id -> unix timestamp of their last replay post
@@ -56,8 +56,8 @@ async def troll_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     last_replay = _troll_last_replay.get(user.id)
     if last_replay and now - last_replay < TROLL_COOLDOWN_SECONDS:
-        await update.message.reply_text('no please stop')
-        await update.message.reply_text("actually I'll just ban you")
+        await update.message.reply_text('col cazzo Felaco che ti metti a spammare comandi')
+        await update.message.reply_text("ti ho appena registrato la tua merda di frigo, adesso te ne stai zitto")
         _troll_banned_until[user.id] = now + TROLL_BAN_SECONDS
         raise ApplicationHandlerStop
 
