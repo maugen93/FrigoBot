@@ -1,8 +1,18 @@
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 from scipy.interpolate import make_interp_spline
 
 import polars as pl
+
+FONT_PATH = os.path.join('resources', 'font.otf')
+fm.fontManager.addfont(FONT_PATH)
+CUSTOM_FONT_NAME = fm.FontProperties(fname=FONT_PATH).get_name()
+plt.rcParams['font.family'] = CUSTOM_FONT_NAME
+
+
 def save_hist(x, y, path):
     x_np = np.array(x)
     y_np = np.array(y)
@@ -96,12 +106,16 @@ def siso_progression(progression, path, season_name):
     for (name, values), label_y in zip(highlighted, label_ys):
         color = PLAYER_COLORS.get(name, DEFAULT_PLAYER_COLOR)
         ax.text(x[-1] + x[-1] * 0.02 + 0.3, label_y, name, color=color,
-                fontsize=10, fontweight='bold', va='center', ha='left')
+                 fontsize=10, fontweight='bold', va='center', ha='left',
+                 fontfamily=CUSTOM_FONT_NAME)
 
     ax.set_title('Andamento Siso — {}'.format(season_name), color=SISO_INK_PRIMARY,
-                  fontsize=14, fontweight='bold', loc='left', pad=14)
-    ax.set_xlabel('Frigo giocate in stagione', color=SISO_INK_MUTED, fontsize=9)
-    ax.set_ylabel('Punteggio (5-1)', color=SISO_INK_MUTED, fontsize=9)
+                  fontsize=14, fontweight='bold', loc='left', pad=14,
+                  fontfamily=CUSTOM_FONT_NAME)
+    ax.set_xlabel('Frigo giocate in stagione', color=SISO_INK_MUTED, fontsize=9,
+                  fontfamily=CUSTOM_FONT_NAME)
+    ax.set_ylabel('Punteggio (5-1)', color=SISO_INK_MUTED, fontsize=9,
+                  fontfamily=CUSTOM_FONT_NAME)
 
     ax.grid(axis='y', color=SISO_GRID, linewidth=0.8, zorder=0)
     ax.grid(axis='x', visible=False)
@@ -111,6 +125,8 @@ def siso_progression(progression, path, season_name):
     ax.spines['bottom'].set_linewidth(0.8)
 
     ax.tick_params(axis='both', colors=SISO_INK_MUTED, labelsize=8, length=0)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontfamily(CUSTOM_FONT_NAME)
     ax.axhline(0, color=SISO_BASELINE, linewidth=0.8, zorder=0)
 
     fig.tight_layout()
@@ -118,26 +134,30 @@ def siso_progression(progression, path, season_name):
     plt.close(fig)
 
 
-def ladderTable(p,r,rd, path):
-    rating=[int(rt)for rt in r]
-    rds=[int(rt)for rt in rd]
-    df=pl.DataFrame({
-        'Frigante':p,
-        'Rating':rating,
-        'RD':rds
+def ladderTable(p, r, rd, path):
+    rating = [int(rt) for rt in r]
+    rds = [int(rt) for rt in rd]
+    df = pl.DataFrame({
+        'Frigante': p,
+        'Rating': rating,
+        'RD': rds
     })
 
-    df=df.sort('Rating', descending=True)
-    df=df.with_columns(pl.Series('Pos',range(1,len(df)+1))).select(['Pos','Frigante','Rating','RD'])
+    df = df.sort('Rating', descending=True)
+    df = df.with_columns(pl.Series('Pos', range(1, len(df) + 1))).select(['Pos', 'Frigante', 'Rating', 'RD'])
 
-    fig,ax=plt.subplots(figsize=(8,4))
+    fig, ax = plt.subplots(figsize=(8, 4))
 
     ax.axis('off')
-    tbl=ax.table(cellText=df.rows(),colLabels=df.columns,loc='center',cellLoc='center',colWidths=[0.1]*len(df.columns))
+    tbl = ax.table(cellText=df.rows(), colLabels=df.columns, loc='center', cellLoc='center',
+                    colWidths=[0.1] * len(df.columns))
 
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(12)
-    tbl.scale(1.2,1.2)
+    tbl.scale(1.2, 1.2)
 
-    plt.savefig(path,bbox_inches='tight')
+    for cell in tbl.get_celld().values():
+        cell.get_text().set_fontfamily(CUSTOM_FONT_NAME)
+
+    plt.savefig(path, bbox_inches='tight')
     plt.close()
