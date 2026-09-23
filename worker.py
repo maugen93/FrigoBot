@@ -580,6 +580,72 @@ def winStreaks(db_path, limit=5):
     return message
 
 
+def loseStreaks(db_path, limit=5):
+    '''Top `limit` lose streak di sempre (su tutta la storia, non solo la
+    stagione in corso). A differenza di winStreaks, non vengono mostrati i
+    link ai replay: solo il numero di frigo perse di fila. Possono comparire
+    più streak dello stesso giocatore. `limit` viene clampato tra 3 e 10.'''
+    if limit > 10:
+        casone = random.randint(2401, 10249)
+        return f"se vabbeh {casone}mila"
+    limit = max(3, min(10, limit))
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    max_frigo = db.getNumberOfFrigos(conn)
+    p1, p2, p3, p4, winners, _, progr, _ = db.getFrigoFromTo(conn, 1, max_frigo)
+    db.closeDbConn(conn)
+
+    player_results = {p: [] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p in player_results:
+                player_results[p].append((p == winners[i], progr[i]))
+
+    streaks = []
+    for p in players:
+        cur_length = 0
+        cur_last_progr = None
+        for won, prog in player_results[p]:
+            if not won:
+                cur_length += 1
+                cur_last_progr = prog
+            else:
+                if cur_length >= 2:
+                    streaks.append((p, cur_length, cur_last_progr))
+                cur_length = 0
+                cur_last_progr = None
+        if cur_length >= 2:
+            streaks.append((p, cur_length, cur_last_progr))
+
+    # a parita' di lunghezza, la streak piu' recente (progr finale piu' alto) va prima
+    streaks.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    top = streaks[:limit]
+
+    if not top:
+        return "Nessuna lose streak degna di questo nome, gente troppo brava"
+
+    top_lengths = [t[1] for t in top]
+    message = 'Top {} lose streak\n'.format(len(top))
+    for player, length, _ in top:
+        rank = sum(1 for l in top_lengths if l > length) + 1
+        tied = sum(1 for l in top_lengths if l == length) > 1
+        label = _ordinal(rank)
+        if tied:
+            label = 't-{}'.format(label)
+        message = message + '\n<code>{}) {}</code> (<code>{}</code>)'.format(
+            label, player, length
+        )
+
+    min_length = min(top_lengths)
+    extra = sum(1 for s in streaks if s[1] == min_length) - sum(1 for l in top_lengths if l == min_length)
+    if extra > 0:
+        rank = sum(1 for l in top_lengths if l > min_length) + 1
+        label = 't-{}'.format(_ordinal(rank))
+        message = message + '\n<code>{}) + altre {}</code>'.format(label, extra)
+
+    return message
+
+
 def _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo):
     best_winrate_player = best_marvwr_player = best_wins_player = None
     best_winrate = best_marvwr = -1

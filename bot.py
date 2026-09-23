@@ -442,6 +442,7 @@ COMMAND_SECTIONS = [
         ("califfi", "albo d'oro califfi"),
         ("swingers", "giocatori più altalenanti di settimana in settimana"),
         ("winstreaks", "top 5 win streak di sempre, con replay"),
+        ("losestreaks", "top 5 lose streak di sempre"),
     ]),
     ("🐽 Animali", [
         ("animali", "classifica animali per vittorie"),
@@ -576,6 +577,18 @@ async def winstreaks_command(update: Update, context: ContextTypes.DEFAULT_TYPE,
     return
 
 
+async def losestreaks_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    command = update.message.text
+    cmds = command.split(' ')
+    limit = 5
+    if len(cmds) > 1 and cmds[1].isdigit():
+        limit = int(cmds[1])
+    await update.message.reply_text(
+        worker.loseStreaks(path, limit), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 def start_bot(token, db_path):
     application = Application.builder().token(token).build()
 
@@ -637,6 +650,7 @@ def start_bot(token, db_path):
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
 
     c_winstreaks = CommandHandler("winstreaks", partial(winstreaks_command, path=db_path))
+    c_losestreaks = CommandHandler("losestreaks", partial(losestreaks_command, path=db_path))
 
     application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
@@ -678,6 +692,7 @@ def start_bot(token, db_path):
     application.add_handler(c_svergiconverters)
     application.add_handler(c_svergitryers)
     application.add_handler(c_winstreaks)
+    application.add_handler(c_losestreaks)
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
