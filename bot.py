@@ -19,7 +19,7 @@ load_dotenv()
 SUPER_USERS = [int(uid) for uid in os.environ.get('SUPER_USERS', '').split(',') if uid.strip()]
 
 TROLL_USERNAME = os.environ.get('TROLL_USERNAME', '').lstrip('@').lower()
-TROLL_COOLDOWN_SECONDS = 60
+TROLL_COOLDOWN_SECONDS = 120
 TROLL_BAN_SECONDS = 5 * 60
 
 # user_id -> unix timestamp of their last replay post
@@ -90,6 +90,14 @@ async def season_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
     return
 
 
+async def sisograph_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    plot_path = worker.sisoProgression(path)
+    await update.message.reply_photo(
+        plot_path, caption='Andamento classifica siso', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 async def score_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
         worker.global_score(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
@@ -129,6 +137,52 @@ async def closeweek_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await update.message.reply_text(
         message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
+    return
+
+
+async def closeseason_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    user = update.message.from_user
+    if user.id not in SUPER_USERS:
+        await update.message.reply_text(
+            'Ti piacerebbe, porco', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    stagione, message = worker.closeSeasonPreview(path)
+    if stagione is None:
+        await update.message.reply_text(message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove())
+        return
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Sì, chiudi", callback_data="csz_confirm"),
+        InlineKeyboardButton("❌ No, lascia stare", callback_data="csz_cancel"),
+    ]])
+    await update.message.reply_text(message, parse_mode='HTML', reply_markup=keyboard)
+    return
+
+
+async def closeseason_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    query = update.callback_query
+    user = query.from_user
+    if user.id not in SUPER_USERS:
+        await query.answer('Ti piacerebbe, porco', show_alert=True)
+        return
+
+    if query.data == 'csz_cancel':
+        await query.answer()
+        await query.edit_message_text('Operazione annullata.', parse_mode='HTML')
+        return
+
+    message, plot_path, caption = worker.closeSeason(path)
+    await query.answer()
+    if message is None:
+        await query.edit_message_text(
+            'Nel frattempo è cambiato qualcosa (stagione già chiusa?), annullo per sicurezza.',
+            parse_mode='HTML'
+        )
+        return
+    await query.edit_message_text(message, parse_mode='HTML')
+    await query.message.reply_photo(plot_path, caption=caption, parse_mode='HTML')
     return
 
 
@@ -350,9 +404,11 @@ COMMAND_SECTIONS = [
         ("week", "classifica settimana in corso"),
         ("global", "classifica all time"),
         ("season / siso", "classifica stagione in corso"),
+        ("sisograph", "grafico andamento classifica siso"),
         ("score", "classifica per punteggio MarvWr"),
         ("califfi", "albo d'oro califfi"),
         ("swingers", "giocatori più altalenanti di settimana in settimana"),
+        ("winstreaks [n]", "top n win streak di sempre, con replay (default 5, min 3, max 10)"),
     ]),
     ("🐽 Animali", [
         ("animali", "classifica animali per vittorie"),
@@ -363,12 +419,12 @@ COMMAND_SECTIONS = [
         ("desaparecidos", "animali che non spawnano da più tempo"),
         ("unicums", "classifica vittorie con animali unici"),
         ("unicum &lt;nome&gt;", "animali unici sverginati da un giocatore"),
-        ("pokewinners &lt;nome&gt;", "animali con cui un giocatore trionfa di più"),
     ]),
     ("👤 Giocatori", [
         ("player &lt;nome&gt;", "scheda giocatore"),
         ("predilette &lt;nome&gt;", "wincon preferite (per numero)"),
         ("affettive &lt;nome&gt;", "wincon preferite (per percentuale)"),
+        ("pokewinners &lt;nome&gt;", "animali con cui un giocatore trionfa di più"),
         ("secchezza &lt;nome&gt;", "da quante frigo non vince"),
         ("svergiconverters", "classifica conversione cessi winconati"),
         ("svergitryers", "classifica tentativi su cessi spawnati"),
@@ -475,6 +531,18 @@ async def svergitryers_command(update: Update, context: ContextTypes.DEFAULT_TYP
     return
 
 
+async def winstreaks_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    command = update.message.text
+    cmds = command.split(' ')
+    limit = 5
+    if len(cmds) > 1 and cmds[1].isdigit():
+        limit = int(cmds[1])
+    await update.message.reply_text(
+        worker.winStreaks(path, limit), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 def start_bot(token, db_path):
     application = Application.builder().token(token).build()
 
@@ -485,6 +553,7 @@ def start_bot(token, db_path):
     c_animali = CommandHandler("animali", partial(animali_command, path=db_path))
     c_season = CommandHandler("season", partial(season_command, path=db_path))
     c_season2 = CommandHandler("siso", partial(season_command, path=db_path))
+    c_sisograph = CommandHandler("sisograph", partial(sisograph_command, path=db_path))
     c_califfi = CommandHandler("califfi", partial(cal_command, path=db_path))
     c_score = CommandHandler("score", partial(score_command, path=db_path))
     c_animale = CommandHandler("animale", partial(animale_command, path=db_path))
@@ -506,6 +575,8 @@ def start_bot(token, db_path):
     c_lad = CommandHandler("ladder", partial(ladder_command, path=db_path))
 
     c_cw = CommandHandler("closeweek", partial(closeweek_command, path=db_path))
+    c_cs = CommandHandler("closesiso", partial(closeseason_command, path=db_path))
+    cb_cs = CallbackQueryHandler(partial(closeseason_callback, path=db_path), pattern="^csz_")
 
     c_clf = CommandHandler("clf", partial(clf_command, path=db_path))
     cb_clf = CallbackQueryHandler(partial(clf_callback, path=db_path), pattern="^clf_")
@@ -530,6 +601,8 @@ def start_bot(token, db_path):
     c_svergiconverters = CommandHandler("svergiconverters", partial(svergiconverters_command, path=db_path))
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
 
+    c_winstreaks = CommandHandler("winstreaks", partial(winstreaks_command, path=db_path))
+
     application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
     application.add_handler(m)
@@ -537,6 +610,7 @@ def start_bot(token, db_path):
     application.add_handler(c_animali)
     application.add_handler(c_season)
     application.add_handler(c_season2)
+    application.add_handler(c_sisograph)
     application.add_handler(c_califfi)
     application.add_handler(c_score)
     application.add_handler(c_query)
@@ -552,6 +626,8 @@ def start_bot(token, db_path):
     application.add_handler(c_and)
     application.add_handler(c_lad)
     application.add_handler(c_cw)
+    application.add_handler(c_cs)
+    application.add_handler(cb_cs)
     application.add_handler(c_clf)
     application.add_handler(cb_clf)
     application.add_handler(c_calc)
@@ -565,6 +641,7 @@ def start_bot(token, db_path):
     application.add_handler(c_wincons)
     application.add_handler(c_svergiconverters)
     application.add_handler(c_svergitryers)
+    application.add_handler(c_winstreaks)
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

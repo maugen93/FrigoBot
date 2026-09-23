@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 SERVICE=frigobot
+BRANCH="${1:-master}"
 
 echo "==> Checking working tree is clean"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
@@ -15,9 +16,12 @@ fi
 echo "==> Stopping $SERVICE"
 sudo systemctl stop "$SERVICE"
 
-echo "==> Pulling latest code"
-git fetch origin
-git merge --ff-only "@{upstream}"
+echo "==> Fetching $BRANCH"
+git fetch origin "$BRANCH"
+
+echo "==> Checking out $BRANCH"
+git checkout "$BRANCH"
+git merge --ff-only "origin/$BRANCH"
 
 echo "==> Syncing dependencies"
 uv sync
@@ -32,5 +36,5 @@ if ! systemctl is-active --quiet "$SERVICE"; then
   exit 1
 fi
 
-echo "==> Deploy OK, $SERVICE is active"
+echo "==> Deploy OK, $SERVICE is active on branch $BRANCH"
 systemctl status "$SERVICE" --no-pager -l | head -5

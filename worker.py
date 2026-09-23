@@ -67,9 +67,53 @@ def insertResult(db_path, sd_link):
     for pid in list(players.keys()):
         # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
         message = message + '\n{}'.format(players[pid]['id'])
-    message = message + '\n' + joks.messForWinnerOnReg(winner_name, poke_winner)
+    message = message + '\n\n' + joks.messForWinnerOnReg(winner_name, poke_winner)
+
+    top5_alert = _closeToTop5Message(c)
+    if top5_alert:
+        message = message + '\n\n' + top5_alert
 
     return message
+
+
+def _closeToTop5Message(conn):
+    '''Se qualcuno, vincendo la prossima frigo, entrerebbe in top 5 nella
+    classifica siso corrente (calcolata a 5-1), ed è già su una win streak
+    in corso, segnala chi e quante vittorie di fila ha.'''
+    season = db.getCurrentSeason(conn)
+    if not season:
+        return ''
+    _, from_frigo = season
+    to_frigo = db.getNumberOfFrigos(conn)
+
+    players, wins, partecipate = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
+    if len(players) < 5:
+        return ''
+    scores = {p: wins[i] * 5 - (partecipate[i] - wins[i]) for i, p in enumerate(players)}
+
+    p1, p2, p3, p4, winners, _, _, _ = db.getFrigoFromTo(conn, from_frigo, to_frigo)
+    player_results = {p: [] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p in player_results:
+                player_results[p].append(p == winners[i])
+
+    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top5_players = {p for p, _ in ranked[:5]}
+    fifth_score = ranked[4][1]
+
+    message = ''
+    for p in players:
+        if p in top5_players:
+            continue
+        streak = 0
+        for won in reversed(player_results[p]):
+            if not won:
+                break
+            streak += 1
+        if streak > 0 and scores[p] + 5 > fifth_score:
+            message = message + joks.messForCloseToTop5(p, streak) + '\n'
+    return message.rstrip('\n')
 
 
 def lastFrigoCancellationPreview(db_path):
@@ -236,6 +280,359 @@ def rank_season(db_path):
     message = message + "Started: 01/07/2026\n"
     message = message + "Will end: 30/09/2026"
     db.closeDbConn(c)
+    return message
+
+
+def _sisoProgressionPlot(conn, players, from_frigo, to_frigo, season_label):
+    p1, p2, p3, p4, winners, _, _, _ = db.getFrigoFromTo(conn, from_frigo, to_frigo)
+
+    scores = {p: 0 for p in players}
+    progression = {p: [0] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p:
+                scores[p] += 5 if p == winners[i] else -1
+        for p in players:
+            progression[p].append(scores[p])
+
+    save_path = 'siso_progression.png'
+    graph.siso_progression(progression, save_path, season_label)
+    return save_path
+
+
+def sisoProgression(db_path):
+    conn = db.openDbConn(db_path)
+    stagione, from_frigo = db.getCurrentSeason(conn)
+    to_frigo = db.getNumberOfFrigos(conn)
+    players, _, _ = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
+    save_path = _sisoProgressionPlot(conn, players, from_frigo, to_frigo, stagione or 'stagione in corso')
+    db.closeDbConn(conn)
+    return save_path
+
+
+def _frigoNumberLink(conn, progr):
+    '''Numero di frigo (es. "#123"), come link al replay se disponibile.'''
+    frigo = db.getFrigoInfoFromNumber(conn, progr)
+    if frigo and frigo['sd_replay']:
+        return '<a href="{}">#{}</a>'.format(html.escape(frigo['sd_replay'], quote=True), progr)
+    return '#{}'.format(progr)
+
+
+def closeSeasonPreview(db_path):
+    '''Anteprima di /closesiso: (stagione, messaggio di conferma), o (None, messaggio) se non c'è
+    nessuna stagione aperta da chiudere.'''
+    conn = db.openDbConn(db_path)
+    stagione, from_frigo = db.getCurrentSeason(conn)
+    if stagione is None:
+        db.closeDbConn(conn)
+        return None, 'Non c\'è nessuna stagione aperta da chiudere.'
+    to_frigo = db.getNumberOfFrigos(conn)
+    from_frigo_link = _frigoNumberLink(conn, from_frigo)
+    to_frigo_link = _frigoNumberLink(conn, to_frigo)
+    db.closeDbConn(conn)
+    message = 'Sicuro di voler chiudere la stagione <code>{}</code> [{} - {}]?'.format(
+        stagione, from_frigo_link, to_frigo_link
+    )
+    return stagione, message
+
+
+def closeSeason(db_path):
+    conn = db.openDbConn(db_path)
+    stagione, from_frigo = db.getCurrentSeason(conn)
+    if stagione is None:
+        db.closeDbConn(conn)
+        return None, None, None
+    to_frigo = db.getNumberOfFrigos(conn)
+
+    players, wins, partecipate = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
+
+    players_dict_arr = [
+        {'player': players[i], '5-1': wins[i] * 5 - (partecipate[i] - wins[i])}
+        for i in range(len(players))
+    ]
+    ordinati = sorted(players_dict_arr, key=lambda x: x['5-1'], reverse=True)
+    winner = ordinati[0]['player']
+
+    wins_before = db.getSeasonWinCount(conn, winner)
+    ordinale_siso = db.getSeasonOrdinal(conn, stagione)
+    db.closeSeason(conn, stagione, to_frigo, winner)
+
+    from_frigo_link = _frigoNumberLink(conn, from_frigo)
+    to_frigo_link = _frigoNumberLink(conn, to_frigo)
+
+    if wins_before == 0:
+        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\n\nSi incorona <b>{}<b>, alla sua prima siso\n'.format(
+            stagione, ordinale_siso, from_frigo_link, to_frigo_link, winner
+        )
+    else:
+        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\n\nSi incorona <b>{}<b>, portandosi a casa la sua {} stagione\n'.format(
+            stagione, ordinale_siso, from_frigo_link, to_frigo_link, winner, joks.ordinale_it(wins_before + 1)
+        )
+
+    message = message + _seasonWinNarrative(conn, from_frigo, to_frigo, winner) + '\n'
+    message = message + _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo)
+
+    plot_path = _sisoProgressionPlot(conn, players, from_frigo, to_frigo, stagione)
+    caption = 'Siso #{} ({}) - Progressione'.format(ordinale_siso, html.escape(stagione))
+
+    db.closeDbConn(conn)
+    return message, plot_path, caption
+
+
+def _seasonWinNarrative(conn, from_frigo, to_frigo, winner):
+    p1, p2, p3, p4, winners, _, _, _ = db.getFrigoFromTo(conn, from_frigo, to_frigo)
+    n = len(winners)
+    if n == 0:
+        return ''
+
+    scores = {}
+    leader_history = []
+    for i in range(n):
+        players_i = (p1[i], p2[i], p3[i], p4[i])
+        for p in players_i:
+            scores.setdefault(p, 0)
+        for p in players_i:
+            scores[p] += 5 if p == winners[i] else -1
+        leader_history.append(max(scores, key=scores.get))
+
+    frac_leading = sum(1 for l in leader_history if l == winner) / n
+
+    final_streak = 0
+    for l in reversed(leader_history):
+        if l != winner:
+            break
+        final_streak += 1
+    frac_final_streak = final_streak / n
+
+    others_scores = [s for p, s in scores.items() if p != winner]
+    margin = scores[winner] - (max(others_scores) if others_scores else scores[winner])
+
+    if frac_leading >= 0.75:
+        category = 'dominio'
+    elif frac_final_streak <= 0.3 and frac_leading < 0.5:
+        category = 'furto'
+    elif margin <= 5:
+        category = 'misura'
+    elif margin >= 25:
+        category = 'schiacciante'
+    else:
+        category = 'normale'
+    return joks.commentoStagioneVittoria(category)
+
+
+def _seasonStreaksAndSwaps(players, p1, p2, p3, p4, winners, progr, replay_link):
+    player_results = {p: [] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p in player_results:
+                player_results[p].append((p == winners[i], progr[i], replay_link[i]))
+
+    best_win_streak = best_secchezza_streak = 0
+    best_win_streak_player = best_secchezza_streak_player = None
+    best_win_streak_matches = []
+    for p in players:
+        cur_win = cur_dry = max_win = max_dry = 0
+        cur_win_matches = []
+        max_win_matches = []
+        for won, prog, link in player_results[p]:
+            if won:
+                cur_win += 1
+                cur_dry = 0
+                cur_win_matches.append((prog, link))
+                if cur_win > max_win:
+                    max_win = cur_win
+                    max_win_matches = list(cur_win_matches)
+            else:
+                cur_dry += 1
+                cur_win = 0
+                cur_win_matches = []
+                max_dry = max(max_dry, cur_dry)
+        if max_win > best_win_streak:
+            best_win_streak = max_win
+            best_win_streak_player = p
+            best_win_streak_matches = max_win_matches
+        if max_dry > best_secchezza_streak:
+            best_secchezza_streak = max_dry
+            best_secchezza_streak_player = p
+
+    scores = {p: 0 for p in players}
+    progression = {p: [0] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p in scores:
+                scores[p] += 5 if p == winners[i] else -1
+        for p in players:
+            progression[p].append(scores[p])
+
+    best_pair = None
+    best_swaps = 0
+    for a_idx in range(len(players)):
+        for b_idx in range(a_idx + 1, len(players)):
+            a, b = players[a_idx], players[b_idx]
+            swaps = 0
+            prev_sign = None
+            for x, y in zip(progression[a], progression[b]):
+                diff = x - y
+                if diff == 0:
+                    continue
+                sign = diff > 0
+                if prev_sign is not None and sign != prev_sign:
+                    swaps += 1
+                prev_sign = sign
+            if swaps > best_swaps:
+                best_swaps = swaps
+                best_pair = (a, b)
+
+    return {
+        'win_streak_player': best_win_streak_player,
+        'win_streak': best_win_streak,
+        'win_streak_matches': best_win_streak_matches,
+        'secchezza_streak_player': best_secchezza_streak_player,
+        'secchezza_streak': best_secchezza_streak,
+        'swap_pair': best_pair,
+        'swap_count': best_swaps,
+    }
+
+
+def _formatWinStreakMatches(matches):
+    items = [
+        '<a href="{}">{}</a>'.format(link, prog) if link else str(prog)
+        for prog, link in matches
+    ]
+    inline = '[{}]'.format('|'.join(items))
+    if len(items) <= 5:
+        return ' ' + inline
+    return '\n' + '\n'.join('  → {}'.format(item) for item in items)
+
+
+def winStreaks(db_path, limit=5):
+    '''Top `limit` win streak di sempre (su tutta la storia, non solo la
+    stagione in corso), con i link ai replay delle frigo che compongono
+    ogni streak. Possono comparire più streak dello stesso giocatore.
+    `limit` viene clampato tra 3 e 10.'''
+    limit = max(3, min(10, limit))
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    max_frigo = db.getNumberOfFrigos(conn)
+    p1, p2, p3, p4, winners, _, progr, replay_link = db.getFrigoFromTo(conn, 1, max_frigo)
+    db.closeDbConn(conn)
+
+    player_results = {p: [] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p in player_results:
+                player_results[p].append((p == winners[i], progr[i], replay_link[i]))
+
+    streaks = []
+    for p in players:
+        cur_matches = []
+        for won, prog, link in player_results[p]:
+            if won:
+                cur_matches.append((prog, link))
+            else:
+                if len(cur_matches) >= 2:
+                    streaks.append((p, len(cur_matches), list(cur_matches), cur_matches[-1][0]))
+                cur_matches = []
+        if len(cur_matches) >= 2:
+            streaks.append((p, len(cur_matches), list(cur_matches), cur_matches[-1][0]))
+
+    # a parita' di lunghezza, la streak piu' recente (progr finale piu' alto) va prima
+    streaks.sort(key=lambda x: (x[1], x[3]), reverse=True)
+    top = streaks[:limit]
+
+    if not top:
+        return "Nessuna win streak degna di questo nome, gente scarsa"
+
+    top_lengths = [t[1] for t in top]
+    message = 'Top {} win streak\n'.format(len(top))
+    for player, length, matches, _ in top:
+        rank = sum(1 for l in top_lengths if l > length) + 1
+        tied = sum(1 for l in top_lengths if l == length) > 1
+        label = _ordinal(rank)
+        if tied:
+            label = 't-{}'.format(label)
+        match_list = _formatWinStreakMatches(matches)
+        message = message + '\n<code>{}) {}</code> (<code>{}</code>){}'.format(
+            label, player, length, match_list
+        )
+
+    min_length = min(top_lengths)
+    extra = sum(1 for s in streaks if s[1] == min_length) - sum(1 for l in top_lengths if l == min_length)
+    if extra > 0:
+        rank = sum(1 for l in top_lengths if l > min_length) + 1
+        label = 't-{}'.format(_ordinal(rank))
+        message = message + '\n<code>{}) + altre {}</code>'.format(label, extra)
+
+    return message
+
+
+def _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo):
+    best_winrate_player = best_marvwr_player = best_wins_player = None
+    best_winrate = best_marvwr = -1
+    best_winrate_games = best_marvwr_games = best_wins_games = -1
+    total_wins = sum(wins)
+
+    for i in range(len(players)):
+        if partecipate[i] >= 10:
+            wr = wins[i] / partecipate[i] * 100
+            if wr > best_winrate:
+                best_winrate = wr
+                best_winrate_player = players[i]
+                best_winrate_games = partecipate[i]
+
+            marvwr = logics.calcMarvWr(partecipate[i], wins[i], total_wins)
+            if marvwr > best_marvwr:
+                best_marvwr = marvwr
+                best_marvwr_player = players[i]
+                best_marvwr_games = partecipate[i]
+
+    best_wins = max(wins) if wins else 0
+    best_wins_idx = wins.index(best_wins)
+    best_wins_player = players[best_wins_idx]
+    best_wins_games = partecipate[best_wins_idx]
+
+    message = '\nPlayer insights di stagione (min 10 frigo):\n'
+    message = message + '🎯 Best winrate: {} (<code>{:.1f}%</code>)[{}]\n'.format(best_winrate_player, best_winrate, best_winrate_games)
+    message = message + '🧮 Best MarvWr: {} (<code>{}</code>)[{}]\n'.format(best_marvwr_player, best_marvwr, best_marvwr_games)
+    message = message + '👑 Max vittorie: {} (<code>{}</code>)[{}]\n\n'.format(best_wins_player, best_wins, best_wins_games)
+
+    cessi_stats = db.getCessiWinconStatsForRange(conn, from_frigo, to_frigo)
+    if cessi_stats:
+        best_sverginatore = max(cessi_stats, key=lambda x: x[2])
+        best_winconatore = max(cessi_stats, key=lambda x: x[1])
+        totale_sverginati = sum(x[2] for x in cessi_stats)
+        message = message + '🔞 Totale cessi sverginati nella siso: <code>{}</code>\n'.format(
+            totale_sverginati
+        )
+        message = message + '🔞 Best sverginatore: {} (<code>{}</code>)\n'.format(
+            best_sverginatore[0], best_sverginatore[2]
+        )
+        message = message + '🎲 Best winconatore di cessi: {} (<code>{}</code>)\n'.format(
+            best_winconatore[0], best_winconatore[1]
+        )
+    else:
+        message = message + '🔞 Nessun cesso sverginato questa siso...\n'
+
+
+
+    p1, p2, p3, p4, match_winners, _, progr, replay_link = db.getFrigoFromTo(conn, from_frigo, to_frigo)
+    streaks = _seasonStreaksAndSwaps(players, p1, p2, p3, p4, match_winners, progr, replay_link)
+
+    message = message + '\n'
+    if streaks['win_streak_player']:
+        match_list = _formatWinStreakMatches(streaks['win_streak_matches'])
+        message = message + '🔥 Win streak più lunga: {} (<code>{}</code>){}\n'.format(
+            streaks['win_streak_player'], streaks['win_streak'], match_list
+        )
+    if streaks['secchezza_streak_player']:
+        message = message + '🏜️ Secchezza più lunga: {} (<code>{}</code>)\n'.format(
+            streaks['secchezza_streak_player'], streaks['secchezza_streak']
+        )
+    if streaks['swap_pair'] and streaks['swap_count'] > 3:
+        message = message + '🔄 Botta e risposta: {} e {} si sono sorpassati in classifica <code>{}</code> volte\n'.format(
+            streaks['swap_pair'][0], streaks['swap_pair'][1], streaks['swap_count']
+        )
+
     return message
 
 
