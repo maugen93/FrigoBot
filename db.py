@@ -696,6 +696,12 @@ def closeSeason(conn, stagione, to_frigo, winner):
     conn.commit()
 
 
+def newSeason(conn, stagione, from_frigo):
+    conn.execute("INSERT INTO stagioni (stagione, from_frigo) VALUES (?, ?)",
+                 (stagione, from_frigo))
+    conn.commit()
+
+
 def getSeasonOrdinal(conn, stagione):
     '''Posizione cronologica (1-based) della stagione tra tutte quelle in stagioni,
     in base a from_frigo.'''
@@ -909,6 +915,23 @@ def getLastFrigoWonByMon(conn, pokemon):
     cur.execute("SELECT MAX(progr) FROM frigos WHERE pokewinner=?", (pokemon,))
     result = cur.fetchone()
     return result[0] if result else None
+
+
+def getFirstWinnerOfMon(conn, pokemon):
+    '''Chi ha sverginato questo animale (il player che ha vinto la prima frigo
+    in cui compare come pokewinner, secondo mon_first_win) e il numero di
+    quella frigo. Ritorna (player, progr) o (None, None) se non ha mai vinto.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT f.winner, f.progr
+        FROM mon_first_win m
+        JOIN frigos f ON f.progr = m.first_win_progr
+        WHERE m.mon=?
+    ''', (pokemon,))
+    result = cur.fetchone()
+    if not result:
+        return None, None
+    return result[0], result[1]
 
 
 def getWinconCountForPokemon(conn, pokemon):

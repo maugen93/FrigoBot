@@ -10,6 +10,7 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 from functools import partial
+import html
 import os
 import time
 
@@ -26,6 +27,9 @@ TROLL_BAN_SECONDS = 5 * 60
 _troll_last_replay = {}
 # user_id -> unix timestamp until which they are banned
 _troll_banned_until = {}
+
+# chat_id -> {"user_id": id of the superuser who closed the season, "from_frigo": first frigo of the new season}
+_pending_new_season = {}
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     user = update.message.from_user
@@ -173,7 +177,7 @@ async def closeseason_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text('Operazione annullata.', parse_mode='HTML')
         return
 
-    message, plot_path, caption = worker.closeSeason(path)
+    message, plot_path, caption, next_from_frigo = worker.closeSeason(path)
     await query.answer()
     if message is None:
         await query.edit_message_text(
@@ -183,6 +187,35 @@ async def closeseason_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     await query.edit_message_text(message, parse_mode='HTML')
     await query.message.reply_photo(plot_path, caption=caption, parse_mode='HTML')
+
+    _pending_new_season[query.message.chat_id] = {'user_id': user.id, 'from_frigo': next_from_frigo}
+    await query.message.reply_text(
+        'Come chiamiamo la nuova siso?', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
+async def new_season_name_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    chat_id = update.effective_chat.id
+    pending = _pending_new_season.get(chat_id)
+    if not pending:
+        return
+    user = update.message.from_user
+    if user.id != pending['user_id']:
+        return
+
+    stagione = update.message.text.strip()
+    if not stagione:
+        return
+
+    worker.startNewSeason(path, stagione, pending['from_frigo'])
+    del _pending_new_season[chat_id]
+    await update.message.reply_text(
+        'Fatto, si parte con la stagione <code>{}</code> da #{}.'.format(
+            html.escape(stagione), pending['from_frigo']
+        ),
+        parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
     return
 
 
@@ -408,7 +441,8 @@ COMMAND_SECTIONS = [
         ("score", "classifica per punteggio MarvWr"),
         ("califfi", "albo d'oro califfi"),
         ("swingers", "giocatori più altalenanti di settimana in settimana"),
-        ("winstreaks [n]", "top n win streak di sempre, con replay (default 5, min 3, max 10)"),
+        ("winstreaks", "top 5 win streak di sempre, con replay"),
+        ("losestreaks", "top 5 lose streak di sempre"),
     ]),
     ("🐽 Animali", [
         ("animali", "classifica animali per vittorie"),
@@ -543,11 +577,25 @@ async def winstreaks_command(update: Update, context: ContextTypes.DEFAULT_TYPE,
     return
 
 
+async def losestreaks_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    command = update.message.text
+    cmds = command.split(' ')
+    limit = 5
+    if len(cmds) > 1 and cmds[1].isdigit():
+        limit = int(cmds[1])
+    await update.message.reply_text(
+        worker.loseStreaks(path, limit), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 def start_bot(token, db_path):
     application = Application.builder().token(token).build()
 
     m = MessageHandler(filters.Regex("(?=.*replay)(?=.*pokemonshowdown)(?=.*freeforallrandombattle)"),
                        partial(handle_message, path=db_path))
+    m_new_season = MessageHandler(filters.TEXT & ~filters.COMMAND,
+                                   partial(new_season_name_message, path=db_path))
 
     c_week = CommandHandler("week", partial(week_command, path=db_path))
     c_animali = CommandHandler("animali", partial(animali_command, path=db_path))
@@ -602,10 +650,12 @@ def start_bot(token, db_path):
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
 
     c_winstreaks = CommandHandler("winstreaks", partial(winstreaks_command, path=db_path))
+    c_losestreaks = CommandHandler("losestreaks", partial(losestreaks_command, path=db_path))
 
     application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
     application.add_handler(m)
+    application.add_handler(m_new_season)
     application.add_handler(c_week)
     application.add_handler(c_animali)
     application.add_handler(c_season)
@@ -642,6 +692,7 @@ def start_bot(token, db_path):
     application.add_handler(c_svergiconverters)
     application.add_handler(c_svergitryers)
     application.add_handler(c_winstreaks)
+    application.add_handler(c_losestreaks)
     # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

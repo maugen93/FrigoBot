@@ -10,6 +10,10 @@ import replay_reader
 
 MAX_RANKING_NAME_WIDTH = 10
 
+def _truncate_name_with_dot(name):
+    if len(name) > 13:
+        return name[:12] + "."
+    return name
 
 def _capped_name_width(names):
     return min(max((len(n) for n in names), default=0), MAX_RANKING_NAME_WIDTH)
@@ -341,7 +345,7 @@ def closeSeason(db_path):
     stagione, from_frigo = db.getCurrentSeason(conn)
     if stagione is None:
         db.closeDbConn(conn)
-        return None, None, None
+        return None, None, None, None
     to_frigo = db.getNumberOfFrigos(conn)
 
     players, wins, partecipate = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
@@ -376,7 +380,14 @@ def closeSeason(db_path):
     caption = 'Siso #{} ({}) - Progressione'.format(ordinale_siso, html.escape(stagione))
 
     db.closeDbConn(conn)
-    return message, plot_path, caption
+    return message, plot_path, caption, to_frigo + 1
+
+
+def startNewSeason(db_path, stagione, from_frigo):
+    conn = db.openDbConn(db_path)
+    db.newSeason(conn, stagione, from_frigo)
+    db.closeDbConn(conn)
+    return
 
 
 def _seasonWinNarrative(conn, from_frigo, to_frigo, winner):
@@ -510,6 +521,9 @@ def winStreaks(db_path, limit=5):
     stagione in corso), con i link ai replay delle frigo che compongono
     ogni streak. Possono comparire più streak dello stesso giocatore.
     `limit` viene clampato tra 3 e 10.'''
+    if limit > 10:
+        casone = random.randint(2401, 10249)
+        return f"se vabbeh {casone}mila"
     limit = max(3, min(10, limit))
     conn = db.openDbConn(db_path)
     players = db.getAllPlayers(conn)
@@ -552,8 +566,74 @@ def winStreaks(db_path, limit=5):
         if tied:
             label = 't-{}'.format(label)
         match_list = _formatWinStreakMatches(matches)
-        message = message + '\n<code>{}) {}</code> (<code>{}</code>){}'.format(
+        message = message + '\n<code>{}) {}</code> (<code>{}</code>)\n  {}'.format(
             label, player, length, match_list
+        )
+
+    min_length = min(top_lengths)
+    extra = sum(1 for s in streaks if s[1] == min_length) - sum(1 for l in top_lengths if l == min_length)
+    if extra > 0:
+        rank = sum(1 for l in top_lengths if l > min_length) + 1
+        label = 't-{}'.format(_ordinal(rank))
+        message = message + '\n<code>{}) + altre {}</code>'.format(label, extra)
+
+    return message
+
+
+def loseStreaks(db_path, limit=5):
+    '''Top `limit` lose streak di sempre (su tutta la storia, non solo la
+    stagione in corso). A differenza di winStreaks, non vengono mostrati i
+    link ai replay: solo il numero di frigo perse di fila. Possono comparire
+    più streak dello stesso giocatore. `limit` viene clampato tra 3 e 10.'''
+    if limit > 10:
+        casone = random.randint(2401, 10249)
+        return f"se vabbeh {casone}mila"
+    limit = max(3, min(10, limit))
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    max_frigo = db.getNumberOfFrigos(conn)
+    p1, p2, p3, p4, winners, _, progr, _ = db.getFrigoFromTo(conn, 1, max_frigo)
+    db.closeDbConn(conn)
+
+    player_results = {p: [] for p in players}
+    for i in range(len(winners)):
+        for p in (p1[i], p2[i], p3[i], p4[i]):
+            if p in player_results:
+                player_results[p].append((p == winners[i], progr[i]))
+
+    streaks = []
+    for p in players:
+        cur_length = 0
+        cur_last_progr = None
+        for won, prog in player_results[p]:
+            if not won:
+                cur_length += 1
+                cur_last_progr = prog
+            else:
+                if cur_length >= 2:
+                    streaks.append((p, cur_length, cur_last_progr))
+                cur_length = 0
+                cur_last_progr = None
+        if cur_length >= 2:
+            streaks.append((p, cur_length, cur_last_progr))
+
+    # a parita' di lunghezza, la streak piu' recente (progr finale piu' alto) va prima
+    streaks.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    top = streaks[:limit]
+
+    if not top:
+        return "Nessuna lose streak degna di questo nome, gente troppo brava"
+
+    top_lengths = [t[1] for t in top]
+    message = 'Top {} lose streak\n'.format(len(top))
+    for player, length, _ in top:
+        rank = sum(1 for l in top_lengths if l > length) + 1
+        tied = sum(1 for l in top_lengths if l == length) > 1
+        label = _ordinal(rank)
+        if tied:
+            label = 't-{}'.format(label)
+        message = message + '\n<code>{}) {}</code> (<code>{}</code>)'.format(
+            label, player, length
         )
 
     min_length = min(top_lengths)
@@ -860,6 +940,11 @@ def wins_animale(animale, path):
         message = message + "<code>{}</code> con {}\n".format(wins[w], winners[w])
 
     message = message + '\nSu <code>{}</code> spawn registrati ha vinto <code>{}</code> volte'.format(spawns_count, wins_count)
+
+    sverginatore, sverginata_progr = db.getFirstWinnerOfMon(conn, top_similar)
+    if sverginatore:
+        message = message + '\n\nSverginato da {}, frigo <code>#{}</code>'.format(sverginatore, sverginata_progr)
+
     message = message + wincon_message
     message =message +spawn_message
     db.closeDbConn(conn)
@@ -1069,9 +1154,9 @@ def predilette(player, db_path, limit=10):
     db.closeDbConn(conn)
 
     if not top:
-        return "{} non ha mai winconato nulla, scarsismo".format(top_similar)
+        return "{} non ha mai winconato nulla?".format(top_similar)
 
-    message = "<b>{}</b> - Top {} wincon predilette (per numero di volte):\n".format(top_similar, len(top))
+    message = "<b>{}</b> - top {} wincon predilette (per numero di volte):\n".format(top_similar, len(top))
 
     rank_width = len(str(len(top)))
     name_width = max((len(mon) for mon, _, _ in top), default=0)
@@ -1107,21 +1192,22 @@ def affettive(player, db_path, limit=10):
     if not top:
         return "{} non ha mai winconato nulla, scarsismo".format(top_similar)
 
-    message = "<b>{}</b> - Top {} wincon affettive (per percentuale):\n".format(top_similar, len(top))
+    message = "<b>{}</b> - top {} wincon affettive (per percentuale):\n".format(top_similar, len(top))
+
+    display_names = [_truncate_name_with_dot(mon) for mon, _, _ in top]
 
     rank_width = len(str(len(top)))
-    name_width = max((len(mon) for mon, _, _ in top), default=0)
+    name_width = min(max((len(n) for n in display_names), default=0), 12)
     cnt_width = max((len(str(wincon_cnt)) for _, wincon_cnt, _ in top), default=1)
     spawn_width = max((len(str(spawn_cnt)) for _, _, spawn_cnt in top), default=1)
 
-    for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top):
+    for i, ((mon, wincon_cnt, spawn_cnt), name) in enumerate(zip(top, display_names)):
         wr = wincon_cnt / spawn_cnt * 100
         message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {wr:>3.0f}% ({cnt:>{cw}}/{spawn:>{sw}})</code>".format(
-            rank=i + 1, name=mon, wr=wr, cnt=wincon_cnt, spawn=spawn_cnt,
+            rank=i + 1, name=name, wr=wr, cnt=wincon_cnt, spawn=spawn_cnt,
             rw=rank_width, nw=name_width, cw=cnt_width, sw=spawn_width
         )
     return message
-
 
 def secchezza(player, db_path):
     conn = db.openDbConn(db_path)
