@@ -696,6 +696,12 @@ def closeSeason(conn, stagione, to_frigo, winner):
     conn.commit()
 
 
+def newSeason(conn, stagione, from_frigo):
+    conn.execute("INSERT INTO stagioni (stagione, from_frigo) VALUES (?, ?)",
+                 (stagione, from_frigo))
+    conn.commit()
+
+
 def getSeasonOrdinal(conn, stagione):
     '''Posizione cronologica (1-based) della stagione tra tutte quelle in stagioni,
     in base a from_frigo.'''
