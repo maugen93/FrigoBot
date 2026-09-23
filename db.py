@@ -626,7 +626,9 @@ def getFrigoFromTo(conn, from_f, to_f):
     p4 = []
     w = []
     pw = []
-    query = '''select player1,player2,player3,player4,winner,pokewinner from frigos where progr>=? and progr<=?'''
+    progr = []
+    replay_link = []
+    query = '''select player1,player2,player3,player4,winner,pokewinner,progr,replay_link from frigos where progr>=? and progr<=? order by progr'''
 
     cur = conn.cursor()
     cur.execute(query, (from_f, to_f,))
@@ -638,7 +640,9 @@ def getFrigoFromTo(conn, from_f, to_f):
         p4.append(r[3])
         w.append(r[4])
         pw.append(r[5])
-    return p1, p2, p3, p4, w, pw
+        progr.append(r[6])
+        replay_link.append(r[7])
+    return p1, p2, p3, p4, w, pw, progr, replay_link
 
 
 def getTrueskillRatingPlayer(conn, player):
@@ -678,6 +682,35 @@ def insertCalippo(conn, w, p, wns):
                     values(?,?,?)''',
                  (w, p, wns))
     conn.commit()
+
+
+def getCurrentSeason(conn):
+    cur = conn.cursor()
+    cur.execute("SELECT stagione, from_frigo FROM stagioni WHERE to_frigo IS NULL")
+    return cur.fetchone()
+
+
+def closeSeason(conn, stagione, to_frigo, winner):
+    conn.execute("UPDATE stagioni SET to_frigo=?, winner=? WHERE stagione=?",
+                 (to_frigo, winner, stagione))
+    conn.commit()
+
+
+def getSeasonOrdinal(conn, stagione):
+    '''Posizione cronologica (1-based) della stagione tra tutte quelle in stagioni,
+    in base a from_frigo.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT COUNT(*) FROM stagioni
+                   WHERE from_frigo <= (SELECT from_frigo FROM stagioni WHERE stagione=?)''',
+                (stagione,))
+    return cur.fetchone()[0]
+
+
+def getSeasonWinCount(conn, player):
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM stagioni WHERE winner=?", (player,))
+    result = cur.fetchone()
+    return result[0] if result[0] else 0
 
 
 def getCaliffi(conn):
@@ -1088,3 +1121,43 @@ def getCessiSpawnsByPlayer(conn, player):
     if not result or result[0] is None:
         return 0
     return result[0]
+
+
+def getCessiWinconStatsForRange(conn, from_frigo, to_frigo):
+    '''Come getCessiWinconByPlayer ma calcolato al volo per un intervallo di frigo
+    (from_frigo/to_frigo inclusi) invece che sull\'intera storia, per stat di fine
+    stagione. Un tentativo (spawns.winconato=1) e\' su un "cesso" se, al progr di
+    quella frigo, l\'animale non aveva ancora mai vinto una frigo (in tutta la
+    storia, non solo nella stagione). Ritorna una lista di tuple
+    (player, tentativi, vinte).'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT s.player,
+               SUM(CASE WHEN NOT EXISTS (
+                        SELECT 1 FROM frigos f2 WHERE f2.pokewinner = s.spawn AND f2.progr < s.frigo
+                   ) THEN 1 ELSE 0 END) AS tentativi,
+               SUM(CASE WHEN NOT EXISTS (
+                        SELECT 1 FROM frigos f2 WHERE f2.pokewinner = s.spawn AND f2.progr < s.frigo
+                   ) AND f.winner = s.player AND f.pokewinner = s.spawn THEN 1 ELSE 0 END) AS vinte
+        FROM spawns s
+        JOIN frigos f ON f.progr = s.frigo
+        WHERE s.winconato = 1 AND s.frigo BETWEEN ? AND ?
+        GROUP BY s.player
+        HAVING tentativi > 0
+    ''', (from_frigo, to_frigo))
+    return cur.fetchall()
+
+
+def getTopWinconedMonsForRange(conn, from_frigo, to_frigo, limit=10):
+    '''Come getTopWinconedMons ma limitato alle frigo con progr tra from_frigo e
+    to_frigo (inclusi), per stat di fine stagione.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT s.spawn, COUNT(*) AS wincon_cnt,
+               SUM(CASE WHEN f.winner = s.player THEN 1 ELSE 0 END) AS wins
+        FROM spawns s
+        JOIN frigos f ON f.progr = s.frigo
+        WHERE s.winconato=1 AND s.frigo BETWEEN ? AND ?
+        GROUP BY s.spawn
+        ORDER BY wincon_cnt DESC
+        LIMIT ?''', (from_frigo, to_frigo, limit))
+    return cur.fetchall()

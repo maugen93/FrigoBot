@@ -1,8 +1,17 @@
 import os
 
+import os
+
 import db
 import polars as pl
 from fpdf import FPDF
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_PATH = os.environ['DB_PATH']
+
 
 from dotenv import load_dotenv
 
