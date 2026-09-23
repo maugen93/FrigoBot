@@ -917,6 +917,23 @@ def getLastFrigoWonByMon(conn, pokemon):
     return result[0] if result else None
 
 
+def getFirstWinnerOfMon(conn, pokemon):
+    '''Chi ha sverginato questo animale (il player che ha vinto la prima frigo
+    in cui compare come pokewinner, secondo mon_first_win) e il numero di
+    quella frigo. Ritorna (player, progr) o (None, None) se non ha mai vinto.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT f.winner, f.progr
+        FROM mon_first_win m
+        JOIN frigos f ON f.progr = m.first_win_progr
+        WHERE m.mon=?
+    ''', (pokemon,))
+    result = cur.fetchone()
+    if not result:
+        return None, None
+    return result[0], result[1]
+
+
 def getWinconCountForPokemon(conn, pokemon):
     '''Quante volte questo animale è stato l'ultimo pokemon in campo (wincon,
     colonna spawns.winconato) per il suo giocatore, indipendentemente dal

@@ -566,7 +566,7 @@ def winStreaks(db_path, limit=5):
         if tied:
             label = 't-{}'.format(label)
         match_list = _formatWinStreakMatches(matches)
-        message = message + '\n<code>{}) {}</code> (<code>{}</code>){}'.format(
+        message = message + '\n<code>{}) {}</code> (<code>{}</code>)\n  {}'.format(
             label, player, length, match_list
         )
 
@@ -940,6 +940,11 @@ def wins_animale(animale, path):
         message = message + "<code>{}</code> con {}\n".format(wins[w], winners[w])
 
     message = message + '\nSu <code>{}</code> spawn registrati ha vinto <code>{}</code> volte'.format(spawns_count, wins_count)
+
+    sverginatore, sverginata_progr = db.getFirstWinnerOfMon(conn, top_similar)
+    if sverginatore:
+        message = message + '\n\nSverginato da {}, frigo <code>#{}</code>'.format(sverginatore, sverginata_progr)
+
     message = message + wincon_message
     message =message +spawn_message
     db.closeDbConn(conn)
