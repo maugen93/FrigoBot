@@ -23,6 +23,14 @@ def _truncate_name(name, width):
     return name if len(name) <= width else name[:width]
 
 
+def _formatDuration(seconds):
+    '''Durata umana in minuti e secondi, es. "12m 34s" (o "45s" se sotto il minuto).'''
+    minutes, secs = divmod(int(seconds), 60)
+    if minutes:
+        return '{}m {}s'.format(minutes, secs)
+    return '{}s'.format(secs)
+
+
 def insertResult(db_path, sd_link):
     # check on link name
     if 'replay' not in sd_link:
@@ -35,7 +43,8 @@ def insertResult(db_path, sd_link):
         c.close()
         return "Replay già caricato"
 
-    players, winner, poke_winner, num_turns = replay_reader.elab_sd_replay(sd_link)
+    players, winner, poke_winner, num_turns, start_time, end_time = replay_reader.elab_sd_replay(sd_link)
+    duration = _formatDuration(end_time - start_time) if start_time is not None and end_time is not None else None
 
     # controllo nick registrati
     for pid in list(players.keys()):
@@ -64,7 +73,8 @@ def insertResult(db_path, sd_link):
 
     # insert
     participants = [players['p1']['id'], players['p2']['id'], players['p3']['id'], players['p4']['id']]
-    db.insertNewFrigo(c, progr, week, data, *participants, winner_name, poke_winner, sd_link, turns=num_turns)
+    db.insertNewFrigo(c, progr, week, data, *participants, winner_name, poke_winner, sd_link, turns=num_turns,
+                       start_time=start_time, end_time=end_time, duration=duration)
     db.updateStatsCacheForFrigo(c, progr, week, participants, spawns_for_cache, winner_name, poke_winner)
 
     message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)
