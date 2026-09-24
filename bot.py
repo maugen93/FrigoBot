@@ -14,6 +14,7 @@ import html
 import os
 import time
 
+import db
 import worker
 
 load_dotenv()
@@ -30,6 +31,19 @@ _troll_banned_until = {}
 
 # chat_id -> {"user_id": id of the superuser who closed the season, "from_frigo": first frigo of the new season}
 _pending_new_season = {}
+
+async def log_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    message = update.effective_message
+    if not message or not message.text:
+        return
+    command = message.text.split()[0].split('@')[0]
+    chat = update.effective_chat
+    in_group = chat.type in ('group', 'supergroup')
+
+    conn = db.openDbConn(path)
+    db.logCommand(conn, chat.id, command, in_group)
+    db.closeDbConn(conn)
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     user = update.message.from_user
@@ -95,7 +109,11 @@ async def season_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
 
 
 async def sisograph_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    user = update.message.from_user
+    if user.id not in SUPER_USERS:
+        return
     plot_path = worker.sisoProgression(path)
+
     await update.message.reply_photo(
         plot_path, caption='Andamento classifica siso', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
@@ -437,7 +455,6 @@ COMMAND_SECTIONS = [
         ("week", "classifica settimana in corso"),
         ("global", "classifica all time"),
         ("season / siso", "classifica stagione in corso"),
-        ("sisograph", "grafico andamento classifica siso"),
         ("score", "classifica per punteggio MarvWr"),
         ("califfi", "albo d'oro califfi"),
         ("swingers", "giocatori più altalenanti di settimana in settimana"),
@@ -652,6 +669,7 @@ def start_bot(token, db_path):
     c_winstreaks = CommandHandler("winstreaks", partial(winstreaks_command, path=db_path))
     c_losestreaks = CommandHandler("losestreaks", partial(losestreaks_command, path=db_path))
 
+    application.add_handler(MessageHandler(filters.COMMAND, partial(log_command, path=db_path)), group=-2)
     application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
     application.add_handler(m)

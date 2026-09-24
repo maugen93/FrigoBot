@@ -1,11 +1,24 @@
 import sqlite3
 import polars
+from datetime import datetime
 
 
 def openDbConn(dbpath):
     conn = sqlite3.connect(dbpath)
     ensureStatsCacheSchema(conn)
+    ensureFrigosSchema(conn)
+    ensureCommandLogSchema(conn)
     return conn
+
+
+def ensureFrigosSchema(conn):
+    '''Aggiunge (se assente) la colonna turns a frigos, per il numero di turni
+    giocati in una frigo (letto dal replay via replay_reader.get_num_turns),
+    cosi' non serve una migrazione separata su ogni frigo.db esistente.'''
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(frigos)")]
+    if 'turns' not in cols:
+        conn.execute("ALTER TABLE frigos ADD COLUMN turns INTEGER")
+        conn.commit()
 
 
 def closeDbConn(conn):
@@ -32,6 +45,26 @@ def ensureStatsCacheSchema(conn):
         wins INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (player, week)
     )''')
+    conn.commit()
+
+
+def ensureCommandLogSchema(conn):
+    '''Crea (se assente) la tabella di log dei comandi Telegram usati (non dei
+    messaggi in generale), per poter tracciare chi usa cosa e da dove.'''
+    conn.execute('''CREATE TABLE IF NOT EXISTS command_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        timestamp TEXT NOT NULL,
+        command TEXT NOT NULL,
+        in_group INTEGER NOT NULL
+    )''')
+    conn.commit()
+
+
+def logCommand(conn, chat_id, command, in_group):
+    conn.execute('''INSERT INTO command_log (chat_id, timestamp, command, in_group)
+                     VALUES (?, ?, ?, ?)''',
+                 (chat_id, datetime.now().isoformat(timespec='seconds'), command, int(in_group)))
     conn.commit()
 
 
@@ -126,11 +159,11 @@ def deleteFrigo(conn, progr):
     rebuildStatsCache(conn)
 
 
-def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link):
-    conn.execute("INSERT INTO frigos (progr, week,data,player1,player2,player3,player4,winner,pokewinner,replay_link) "
-                 "VALUES (?,?,?,?,?,?,?,?,?,?)",
+def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link, turns=None):
+    conn.execute("INSERT INTO frigos (progr, week,data,player1,player2,player3,player4,winner,pokewinner,replay_link,turns) "
+                 "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                  (progr, week, data, p1, p2, p3, p4,
-                  w, pw, sd_link))
+                  w, pw, sd_link, turns))
     conn.commit()
 
 
@@ -178,6 +211,35 @@ def updatePokewinner(conn, frigo, new_pokewinner):
     cur = conn.execute("UPDATE frigos SET pokewinner=? WHERE progr=?", (new_pokewinner, frigo))
     conn.commit()
     return cur.rowcount
+
+
+def setTurns(conn, progr, turns):
+    cur = conn.execute("UPDATE frigos SET turns=? WHERE progr=?", (turns, progr))
+    conn.commit()
+    return cur.rowcount
+
+
+def getFrigosToBackfillTurns(conn, frigo_nrs=None):
+    '''Frigo con replay ma senza turns salvato (caricate prima che la colonna
+    esistesse). Con frigo_nrs esplicito rilegge anche quelle già marcate, per
+    un test puntuale su una o due frigo (stesso pattern di getFrigosToBackfillWinconato).'''
+    cur = conn.cursor()
+    if frigo_nrs:
+        placeholders = ','.join('?' * len(frigo_nrs))
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE progr IN ({}) AND replay_link IS NOT NULL ORDER BY progr".format(placeholders),
+            frigo_nrs
+        )
+    else:
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE replay_link IS NOT NULL AND turns IS NULL "
+            "ORDER BY progr"
+        )
+    result = cur.fetchall()
+    cur.close()
+    return result
 
 
 def getFrigosToBackfillWinconato(conn, frigo_nrs=None):
