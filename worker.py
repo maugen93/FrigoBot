@@ -35,7 +35,7 @@ def insertResult(db_path, sd_link):
         c.close()
         return "Replay già caricato"
 
-    players, winner, poke_winner = replay_reader.elab_sd_replay(sd_link)
+    players, winner, poke_winner, num_turns = replay_reader.elab_sd_replay(sd_link)
 
     # controllo nick registrati
     for pid in list(players.keys()):
@@ -64,7 +64,7 @@ def insertResult(db_path, sd_link):
 
     # insert
     participants = [players['p1']['id'], players['p2']['id'], players['p3']['id'], players['p4']['id']]
-    db.insertNewFrigo(c, progr, week, data, *participants, winner_name, poke_winner, sd_link)
+    db.insertNewFrigo(c, progr, week, data, *participants, winner_name, poke_winner, sd_link, turns=num_turns)
     db.updateStatsCacheForFrigo(c, progr, week, participants, spawns_for_cache, winner_name, poke_winner)
 
     message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)

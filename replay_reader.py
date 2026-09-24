@@ -31,6 +31,18 @@ Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment
     return s
 
 
+def get_num_turns(log_rows):
+    '''Numero totale di turni giocati in una frigo, letto dalle righe |turn|N
+    del log Showdown (N e' il numero del turno appena iniziato, quindi l'ultimo
+    valore visto e' il totale di turni della partita). Torna 0 se non c'e'
+    nessuna riga |turn| nel log.'''
+    num_turns = 0
+    for log_i in log_rows:
+        if log_i.startswith('|turn|'):
+            num_turns = int(log_i.split('|')[2])
+    return num_turns
+
+
 def elab_sd_replay(link_replay):
     data = json.loads(
         requests.get(link_replay + ".json").content)
@@ -78,7 +90,9 @@ def elab_sd_replay(link_replay):
     # il pokewinner e' il wincon del vincitore, cioe' l'ultimo animale che ha mandato in campo
     pokewinner = players[winner_id]['ultimo_in_campo']
 
-    return players, winner, pokewinner
+    num_turns = get_num_turns(log_rows)
+
+    return players, winner, pokewinner, num_turns
 
 
 
