@@ -12,12 +12,25 @@ def openDbConn(dbpath):
 
 
 def ensureFrigosSchema(conn):
-    '''Aggiunge (se assente) la colonna turns a frigos, per il numero di turni
-    giocati in una frigo (letto dal replay via replay_reader.get_num_turns),
-    cosi' non serve una migrazione separata su ogni frigo.db esistente.'''
+    '''Aggiunge (se assenti) le colonne turns/start_time/end_time/duration a
+    frigos, cosi' non serve una migrazione separata su ogni frigo.db esistente.
+    turns e' il numero di turni giocati (letto dal replay via
+    replay_reader.get_num_turns). start_time/end_time sono i primi/ultimi unix
+    timestamp trovati nel log del replay (righe |t:|, via
+    replay_reader.get_first_last_timestamps); duration e' end_time-start_time
+    formattato in minuti e secondi (es. "12m 34s").'''
     cols = [row[1] for row in conn.execute("PRAGMA table_info(frigos)")]
     if 'turns' not in cols:
         conn.execute("ALTER TABLE frigos ADD COLUMN turns INTEGER")
+        conn.commit()
+    if 'start_time' not in cols:
+        conn.execute("ALTER TABLE frigos ADD COLUMN start_time INTEGER")
+        conn.commit()
+    if 'end_time' not in cols:
+        conn.execute("ALTER TABLE frigos ADD COLUMN end_time INTEGER")
+        conn.commit()
+    if 'duration' not in cols:
+        conn.execute("ALTER TABLE frigos ADD COLUMN duration TEXT")
         conn.commit()
 
 
@@ -159,11 +172,13 @@ def deleteFrigo(conn, progr):
     rebuildStatsCache(conn)
 
 
-def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link, turns=None):
-    conn.execute("INSERT INTO frigos (progr, week,data,player1,player2,player3,player4,winner,pokewinner,replay_link,turns) "
-                 "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link, turns=None,
+                    start_time=None, end_time=None, duration=None):
+    conn.execute("INSERT INTO frigos (progr, week,data,player1,player2,player3,player4,winner,pokewinner,replay_link,turns,"
+                 "start_time,end_time,duration) "
+                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                  (progr, week, data, p1, p2, p3, p4,
-                  w, pw, sd_link, turns))
+                  w, pw, sd_link, turns, start_time, end_time, duration))
     conn.commit()
 
 
@@ -219,6 +234,13 @@ def setTurns(conn, progr, turns):
     return cur.rowcount
 
 
+def setTimestamps(conn, progr, start_time, end_time, duration):
+    cur = conn.execute("UPDATE frigos SET start_time=?, end_time=?, duration=? WHERE progr=?",
+                        (start_time, end_time, duration, progr))
+    conn.commit()
+    return cur.rowcount
+
+
 def getFrigosToBackfillTurns(conn, frigo_nrs=None):
     '''Frigo con replay ma senza turns salvato (caricate prima che la colonna
     esistesse). Con frigo_nrs esplicito rilegge anche quelle già marcate, per
@@ -235,6 +257,30 @@ def getFrigosToBackfillTurns(conn, frigo_nrs=None):
         cur.execute(
             "SELECT progr, replay_link FROM frigos "
             "WHERE replay_link IS NOT NULL AND turns IS NULL "
+            "ORDER BY progr"
+        )
+    result = cur.fetchall()
+    cur.close()
+    return result
+
+
+def getFrigosToBackfillTimestamps(conn, frigo_nrs=None):
+    '''Frigo con replay ma senza start_time/end_time/duration salvati (caricate
+    prima che le colonne esistessero). Con frigo_nrs esplicito rilegge anche
+    quelle già marcate, per un test puntuale su una o due frigo (stesso pattern
+    di getFrigosToBackfillTurns).'''
+    cur = conn.cursor()
+    if frigo_nrs:
+        placeholders = ','.join('?' * len(frigo_nrs))
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE progr IN ({}) AND replay_link IS NOT NULL ORDER BY progr".format(placeholders),
+            frigo_nrs
+        )
+    else:
+        cur.execute(
+            "SELECT progr, replay_link FROM frigos "
+            "WHERE replay_link IS NOT NULL AND start_time IS NULL "
             "ORDER BY progr"
         )
     result = cur.fetchall()

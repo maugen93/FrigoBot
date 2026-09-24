@@ -43,6 +43,17 @@ def get_num_turns(log_rows):
     return num_turns
 
 
+def get_first_last_timestamps(log_rows):
+    '''Primo e ultimo unix timestamp trovato nelle righe |t:|N del log Showdown
+    (righe intervallate tra i messaggi chat, non una per messaggio). Il primo
+    segna l'inizio della battaglia, l'ultimo la fine. Torna (None, None) se il
+    log non ha nessuna riga |t:|.'''
+    timestamps = [int(log_i.split('|')[2]) for log_i in log_rows if log_i.startswith('|t:|')]
+    if not timestamps:
+        return None, None
+    return timestamps[0], timestamps[-1]
+
+
 def elab_sd_replay(link_replay):
     data = json.loads(
         requests.get(link_replay + ".json").content)
@@ -91,8 +102,9 @@ def elab_sd_replay(link_replay):
     pokewinner = players[winner_id]['ultimo_in_campo']
 
     num_turns = get_num_turns(log_rows)
+    start_time, end_time = get_first_last_timestamps(log_rows)
 
-    return players, winner, pokewinner, num_turns
+    return players, winner, pokewinner, num_turns, start_time, end_time
 
 
 
