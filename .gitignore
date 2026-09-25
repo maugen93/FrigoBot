@@ -8,3 +8,4 @@ frigo.db-journal
 frigo.db-wal
 frigo.db-shm
 frigo.db.bak*
+backfill_*

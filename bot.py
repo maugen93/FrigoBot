@@ -110,10 +110,10 @@ async def f_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state['senders'][user.id] = user.mention_html(user.first_name)
 
     if len(state['senders']) >= F_THRESHOLD:
-        tags = " ".join(state['senders'].values())
+        tags = " \n".join(state['senders'].values())
         del _f_tracker[chat.id]
         await context.bot.send_message(
-            chat.id, 'loggare {}'.format(tags), parse_mode='HTML'
+            chat.id, 'loggare\n{}'.format(tags), parse_mode='HTML'
         )
     return
 
