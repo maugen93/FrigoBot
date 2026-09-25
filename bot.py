@@ -662,7 +662,7 @@ def start_bot(token, db_path):
                        partial(handle_message, path=db_path))
     m_new_season = MessageHandler(filters.TEXT & ~filters.COMMAND,
                                    partial(new_season_name_message, path=db_path))
-    m_f = MessageHandler(filters.Regex(r'^F$') & filters.ChatType.GROUPS, f_message)
+    m_f = MessageHandler(filters.Regex(r'(?i)^F$') & filters.ChatType.GROUPS, f_message)
 
     c_week = CommandHandler("week", partial(week_command, path=db_path))
     c_animali = CommandHandler("animali", partial(animali_command, path=db_path))
