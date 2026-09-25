@@ -1264,6 +1264,36 @@ def getCessiSpawnsByPlayer(conn, player):
     return result[0]
 
 
+def getWinconPopularityForAllMons(conn):
+    '''Per ogni animale mai scelto come wincon (spawns.winconato=1), quante volte
+    è stato winconato in totale e da quanti giocatori distinti. Usato per il calcolo
+    della "popolarità" di una wincon nell'edginess score (worker.edginessRanking).
+    Ritorna una lista di tuple (mon, wincon_cnt, distinct_players).'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn, COUNT(*) AS wincon_cnt, COUNT(DISTINCT player) AS distinct_players
+        FROM spawns
+        WHERE winconato=1
+        GROUP BY spawn
+    ''')
+    return cur.fetchall()
+
+
+def getWinconedMonsByPlayer(conn, player):
+    '''Tutti gli animali scelti come wincon (spawns.winconato=1) da questo giocatore,
+    con quante volte ciascuno, senza limite (a differenza di getTopMostWinconedByPlayer).
+    Usato per il calcolo dell'edginess score (worker.edginessRanking).
+    Ritorna una lista di tuple (mon, wincon_cnt).'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn, COUNT(*) AS wincon_cnt
+        FROM spawns
+        WHERE player=? AND winconato=1
+        GROUP BY spawn
+    ''', (player,))
+    return cur.fetchall()
+
+
 def getCessiWinconStatsForRange(conn, from_frigo, to_frigo):
     '''Come getCessiWinconByPlayer ma calcolato al volo per un intervallo di frigo
     (from_frigo/to_frigo inclusi) invece che sull\'intera storia, per stat di fine

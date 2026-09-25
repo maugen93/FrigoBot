@@ -10,6 +10,11 @@ import logics
 import replay_reader
 
 MAX_RANKING_NAME_WIDTH = 10
+MIN_GAMES_FOR_RANKING = 10
+
+EDGY_CESSO_BONUS = 15
+EDGY_RARE_BASE = 6
+EDGY_POPULAR_PENALTY_MAX = 12
 
 def _truncate_name_with_dot(name):
     if len(name) > 13:
@@ -36,7 +41,6 @@ def _durationOutlierMessage(duration_seconds, num_turns, past_durations):
     '''Messaggio sulla durata, solo se la frigo è nel 5% più lento o più
     veloce di sempre (percentile <=5 o >=95 su past_durations, che non
     include la frigo corrente). Se batte il record assoluto lo segnala.'''
-    print(duration_seconds, past_durations)
 
     if not past_durations:
         return None
@@ -48,13 +52,13 @@ def _durationOutlierMessage(duration_seconds, num_turns, past_durations):
     if duration_seconds >= p95:
         text = "Si è frigato per un totale esorbitante di {} minuti e {} secondi ({} turni)".format(mm, ss, num_turns)
         if duration_seconds > max(past_durations):
-            text += ", nuovo record di lentezza di sempre! 🐌"
+            text += ", diobò non si è mai frigato per così tanto EVER 🐌"
         return text
 
     if duration_seconds <= p5:
-        text = "Frigo speedrun, {} minuti e {} secondi ({} turni)".format(mm, ss, num_turns)
+        text = "Frigo speedrun da {} minuti e {} secondi ({} turni)".format(mm, ss, num_turns)
         if duration_seconds < min(past_durations):
-            text += ", nuovo record di velocità di sempre! ⚡"
+            text += ", frigo speedrun record di sempre godo?⚡"
         return text
 
     return None
@@ -63,19 +67,18 @@ def _durationOutlierMessage(duration_seconds, num_turns, past_durations):
 def insertResult(db_path, sd_link):
     # check on link name
     if 'replay' not in sd_link:
-        return None
+        return None, None
     if 'freeforallrandombattle' not in sd_link:
-        return None
+        return None, None
 
     c = db.openDbConn(db_path)
     if db.isSDReplayAlreadyLoaded(c, sd_link):
         c.close()
-        return "Replay già caricato"
+        return "Replay già caricato", None
 
     players, winner, poke_winner, num_turns, start_time, end_time = replay_reader.elab_sd_replay(sd_link)
     duration_seconds = end_time - start_time if start_time is not None and end_time is not None else None
     duration = _formatDuration(duration_seconds) if duration_seconds is not None else None
-    print(duration, duration_seconds, len(db.getAllDurationsSeconds(c)))
     past_durations = db.getAllDurationsSeconds(c)
 
     # controllo nick registrati
@@ -85,7 +88,7 @@ def insertResult(db_path, sd_link):
 
         if not player:
             c.close()
-            return 'Collo {} non presente nel DB'.format(played_sd)
+            return 'Collo {} non presente nel DB'.format(played_sd), None
         players[pid]['id'] = player
 
     progr = db.getNumberOfFrigos(c) + 1
@@ -113,58 +116,46 @@ def insertResult(db_path, sd_link):
     for pid in list(players.keys()):
         # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
         message = message + '\n{}'.format(players[pid]['id'])
-    message = message + '\n\n' + joks.messForWinnerOnReg(winner_name, poke_winner)
+    message = message + '\n\n' + joks.messForWinnerOnReg(winner_name, poke_winner, seed=progr)
 
     if duration_seconds is not None:
         duration_alert = _durationOutlierMessage(duration_seconds, num_turns, past_durations)
         if duration_alert:
             message = message + '\n\n' + duration_alert
 
-    top5_alert = _closeToTop5Message(c)
-    if top5_alert:
-        message = message + '\n\n' + top5_alert
+    leader_alert = _newSisoLeaderMessage(c, progr)
 
-    return message
+    return message, leader_alert
 
 
-def _closeToTop5Message(conn):
-    '''Se qualcuno, vincendo la prossima frigo, entrerebbe in top 5 nella
-    classifica siso corrente (calcolata a 5-1), ed è già su una win streak
-    in corso, segnala chi e quante vittorie di fila ha.'''
+def _sisoLeader(conn, from_frigo, to_frigo):
+    '''Chi guida la classifica siso (5-1) su [from_frigo, to_frigo], o None se
+    non c'e' ancora nessuna frigo nel range.'''
+    players, wins, partecipate = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
+    if not players:
+        return None
+    scores = {p: wins[i] * 5 - (partecipate[i] - wins[i]) for i, p in enumerate(players)}
+    return max(scores, key=scores.get)
+
+
+def _newSisoLeaderMessage(conn, progr):
+    '''Se questa frigo ha appena cambiato chi guida la classifica siso
+    corrente, lo segnala. None se non c'e' una stagione aperta, se e' la
+    prima frigo della stagione (nessun "prima" con cui confrontare), o se il
+    leader non e' cambiato.'''
     season = db.getCurrentSeason(conn)
     if not season:
-        return ''
+        return None
     _, from_frigo = season
-    to_frigo = db.getNumberOfFrigos(conn)
+    if progr - 1 < from_frigo:
+        return None
 
-    players, wins, partecipate = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
-    if len(players) < 5:
-        return ''
-    scores = {p: wins[i] * 5 - (partecipate[i] - wins[i]) for i, p in enumerate(players)}
+    leader_before = _sisoLeader(conn, from_frigo, progr - 1)
+    leader_after = _sisoLeader(conn, from_frigo, progr)
 
-    p1, p2, p3, p4, winners, _, _, _ = db.getFrigoFromTo(conn, from_frigo, to_frigo)
-    player_results = {p: [] for p in players}
-    for i in range(len(winners)):
-        for p in (p1[i], p2[i], p3[i], p4[i]):
-            if p in player_results:
-                player_results[p].append(p == winners[i])
-
-    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    top5_players = {p for p, _ in ranked[:5]}
-    fifth_score = ranked[4][1]
-
-    message = ''
-    for p in players:
-        if p in top5_players:
-            continue
-        streak = 0
-        for won in reversed(player_results[p]):
-            if not won:
-                break
-            streak += 1
-        if streak > 0 and scores[p] + 5 > fifth_score:
-            message = message + joks.messForCloseToTop5(p, streak) + '\n'
-    return message.rstrip('\n')
+    if leader_before and leader_after and leader_before != leader_after:
+        return 'Ocio, nuovo leader di /siso'
+    return None
 
 
 def lastFrigoCancellationPreview(db_path):
@@ -220,7 +211,7 @@ def frigoInfo(frigo_nr, db_path):
             message = message + '\n{}'.format(p)
     if any(p is None for p in players):
         message = message + '\n\n(frigo dell\'età della pietra, dati parziali)\n'
-    message = message + '\n' + joks.messForWinnerOnReg(frigo['winner'], frigo['pokewinner'])
+    message = message + '\n' + joks.messForWinnerOnReg(frigo['winner'], frigo['pokewinner'], seed=frigo['progr'])
 
     if frigo['sd_replay']:
 
@@ -475,7 +466,7 @@ def _seasonWinNarrative(conn, from_frigo, to_frigo, winner):
         category = 'schiacciante'
     else:
         category = 'normale'
-    return joks.commentoStagioneVittoria(category)
+    return joks.commentoStagioneVittoria(category, seed=to_frigo)
 
 
 def _seasonStreaksAndSwaps(players, p1, p2, p3, p4, winners, progr, replay_link):
@@ -870,6 +861,8 @@ def swingRanking(db_path):
     results = []
     for p in players:
         weekly_games, weekly_wins = db.getWeeklyGamesAndWinsByPlayer(conn, p)
+        if sum(weekly_games) < MIN_GAMES_FOR_RANKING:
+            continue
         swing = logics.calcWinrateVariability(weekly_games, weekly_wins)
         if swing is not None:
             results.append((p, swing))
@@ -899,6 +892,8 @@ def svergiconvertersRanking(db_path):
         tentativi, vinte = db.getCessiWinconByPlayer(conn, p)
         if tentativi > 0:
             _, winners_whenPlayed = db.getPlayerInfo(conn, p)
+            if len(winners_whenPlayed) < MIN_GAMES_FOR_RANKING:
+                continue
             results.append((p, vinte, tentativi, vinte / tentativi * 100, len(winners_whenPlayed)))
     db.closeDbConn(conn)
 
@@ -928,6 +923,9 @@ def svergitryersRanking(db_path):
         tentativi, vinte = db.getCessiWinconByPlayer(conn, p)
         cessi_spawnati = db.getCessiSpawnsByPlayer(conn, p)
         if cessi_spawnati > 0:
+            _, winners_whenPlayed = db.getPlayerInfo(conn, p)
+            if len(winners_whenPlayed) < MIN_GAMES_FOR_RANKING:
+                continue
             results.append((p, vinte, tentativi, cessi_spawnati, tentativi / cessi_spawnati * 100))
     db.closeDbConn(conn)
 
@@ -945,6 +943,67 @@ def svergitryersRanking(db_path):
         message = message + "<code>{rank:>{rw}}) {name:<{nw}} {perc:>{pw}.0f}% ({tentativi:>{tw}}/{cs:>{cw}}, {vinte:>{vw}})</code>\n".format(
             rank=i + 1, name=_truncate_name(player, name_width), perc=perc, tentativi=tentativi, cs=cessi_spawnati, vinte=vinte,
             rw=rank_width, nw=name_width, pw=3, tw=tentativi_width, cw=spawnati_width, vw=vinte_width
+        )
+    return message
+
+
+def edginessRanking(db_path):
+    '''Edginess Ranking: quanto un giocatore la tira lunga scegliendo wincon
+    fuori dal coro. Per ogni wincon (spawns.winconato=1) di un giocatore:
+      - se al momento del tentativo l'animale era un "cesso" (mai vinto prima),
+        bonus fisso EDGY_CESSO_BONUS (a prescindere dal fatto che poi vinca o no,
+        vedi db.getCessiWinconByPlayer/tentativi);
+      - altrimenti bonus/malus in base a quanto quell'animale è winconato in
+        generale: popolarità = (volte winconato da chiunque) * (giocatori distinti
+        che lo hanno winconato), normalizzata sul massimo osservato. Popolarità
+        bassa -> vicino a +EDGY_RARE_BASE, popolarità alta -> vicino a
+        -EDGY_POPULAR_PENALTY_MAX (unica formula continua, niente doppio conteggio
+        con il bonus cesso).
+    Il punteggio totale è renormalizzato sul numero di frigo giocate (serve un
+    minimo di MIN_GAMES_FOR_RANKING per entrare in classifica, come le altre
+    ranking).'''
+    conn = db.openDbConn(db_path)
+
+    popularity = {}
+    max_popularity = 0
+    for mon, wincon_cnt, distinct_players in db.getWinconPopularityForAllMons(conn):
+        pop = wincon_cnt * distinct_players
+        popularity[mon] = pop
+        max_popularity = max(max_popularity, pop)
+
+    players = db.getAllPlayers(conn)
+    results = []
+    for p in players:
+        _, winners_whenPlayed = db.getPlayerInfo(conn, p)
+        games = len(winners_whenPlayed)
+        if games < MIN_GAMES_FOR_RANKING:
+            continue
+
+        cesso_tentativi, _ = db.getCessiWinconByPlayer(conn, p)
+        cesso_score = cesso_tentativi * EDGY_CESSO_BONUS
+
+        pop_score = 0.0
+        for mon, wincon_cnt in db.getWinconedMonsByPlayer(conn, p):
+            pop_norm = popularity.get(mon, 0) / max_popularity if max_popularity else 0
+            pop_score += wincon_cnt * (EDGY_RARE_BASE - EDGY_POPULAR_PENALTY_MAX * pop_norm)
+
+        edginess = (cesso_score + pop_score) / games
+        results.append((p, edginess, cesso_tentativi, games))
+    db.closeDbConn(conn)
+
+    results.sort(key=lambda x: x[1], reverse=True)
+
+    message = 'Edginess Ranking\n(edginess score, cessi winconati)\n\n'
+
+    rank_width = len(str(len(results)))
+    name_width = _capped_name_width(player for player, _, _, _ in results)
+    cesso_width = max((len(str(c)) for _, _, c, _ in results), default=1)
+    games_width = max((len(str(g)) for _, _, _, g in results), default=1)
+
+    for i, (player, edginess, cesso_tentativi, games) in enumerate(results):
+        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {edginess:>6.1f} ({cesso:>{cw}})</code>\n".format(
+            rank=i + 1, name=_truncate_name(player, name_width), edginess=edginess*10, cesso=cesso_tentativi, games=games,
+            rw=rank_width, nw=name_width, cw=cesso_width, gw=games_width
         )
     return message
 
@@ -1068,13 +1127,14 @@ def playerCard(player, db_path):
         p_cessi_tentativi, p_cessi_vinte = db.getCessiWinconByPlayer(conn, p)
 
         all_wins.append(p_num_wins)
-        all_winrates.append(p_winrate)
         all_marvwr.append(p_marvwr)
         all_animali_unici.append(len(p_animali_unici))
-        if p_swing is not None:
-            all_swing.append(p_swing['score'])
-        if p_cessi_tentativi > 0:
-            all_cessi_wr.append(p_cessi_vinte / p_cessi_tentativi * 100)
+        if len(p_winners_whenPlayed) >= MIN_GAMES_FOR_RANKING:
+            all_winrates.append(p_winrate)
+            if p_swing is not None:
+                all_swing.append(p_swing['score'])
+            if p_cessi_tentativi > 0:
+                all_cessi_wr.append(p_cessi_vinte / p_cessi_tentativi * 100)
 
         if p == top_similar:
             num_wins = p_num_wins
@@ -1297,7 +1357,6 @@ def secchezza(player, db_path):
     message = message + 'ultima frigo giocata <code>{}</code> frigo fa\n'.format(notgame)
 
     w = db.getActualWeek(conn)
-    print(w)
     num_in_week = db.getPartecipiedAtWeek(conn, w, top_similar)
     message = message + 'Frigo giocate in settimana: <code>{}</code>'.format(num_in_week)
     db.closeDbConn(conn)
