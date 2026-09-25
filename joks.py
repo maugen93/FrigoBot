@@ -11,16 +11,8 @@ def ordinale_it(n):
     return ORDINALI_IT.get(n, '{}-esima'.format(n))
 
 
-def messForCloseToTop5(player, streak):
-    templates = [
-        "🚨 Ocio, <b>{}</b> è a una win dall'entrare in top 5 winstric (<code>{}</code>)",
-        "🚨 <b>{}</b> sta per sfondare la top 5 winstrix, <code>{}</code> vittorie di fila",
-        "🚨 Oh calma, <b>{}</b> è in striscia di <code>{}</code> winz",
-    ]
-    return random.choice(templates).format(player, streak)
-
-
-def messForWinnerOnReg(winner_name, pk_winner):
+def messForWinnerOnReg(winner_name, pk_winner, seed=None):
+    rng = random.Random(seed)
     winner_name = f'<b>{winner_name}</b>'
     specific_users = {
         'mule': 'Ancora una volta obnubilati dalle lagne di quel maledetto porco. LO ODIO ({})'.format(pk_winner),
@@ -39,14 +31,14 @@ def messForWinnerOnReg(winner_name, pk_winner):
                 'Trionfa {} con {}, impunito'.format(winner_name, pk_winner)]
 
     if winner_name not in specific_users:
-        return random.choice(defaults)
+        return rng.choice(defaults)
 
-    coinflip = random.randint(0, 6)
+    coinflip = rng.randint(0, 6)
 
     if coinflip <4:
         return specific_users[winner_name]
     else:
-        return random.choice(defaults)
+        return rng.choice(defaults)
 
 
 def str_sverg(sverginatori):
@@ -63,7 +55,8 @@ def str_sverg(sverginatori):
 
     return f"{stringa_elementi} (<code>{occorrenza_massima}</code>)"
 
-def commentoStagioneVittoria(category):
+def commentoStagioneVittoria(category, seed=None):
+    rng = random.Random(seed)
     comments = {
         'dominio': [
             "👑 Dominata dall'inizio alla fine",
@@ -91,7 +84,7 @@ def commentoStagioneVittoria(category):
             "📈 Nulla di eclatante, ma porta a casa il risultato",
         ],
     }
-    return random.choice(comments.get(category, comments['normale']))
+    return rng.choice(comments.get(category, comments['normale']))
 
 
 def commentoMedia(f_per_day):

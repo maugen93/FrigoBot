@@ -57,11 +57,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
     if user.username and user.username.lower() == TROLL_USERNAME:
         _troll_last_replay[user.id] = time.time()
 
-    message = worker.insertResult(path, update.message.text)
+    message, leader_alert = worker.insertResult(path, update.message.text)
     if message:
         await update.message.reply_text(
             message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
         )
+    if leader_alert:
+        await update.message.reply_text(leader_alert, parse_mode='HTML')
     time.sleep(5)
     await context.bot.send_message(update.message.chat_id, 'prossima')
     return
@@ -517,6 +519,7 @@ COMMAND_SECTIONS = [
         ("secchezza &lt;nome&gt;", "da quante frigo non vince"),
         ("svergiconverters", "classifica conversione cessi winconati"),
         ("svergitryers", "classifica tentativi su cessi spawnati"),
+        ("edgy", "classifica edginess"),
     ]),
     ("🧊 Altro", [
         ("frigo &lt;numero&gt;", "dettagli di una frigo specifica"),
@@ -620,6 +623,13 @@ async def svergitryers_command(update: Update, context: ContextTypes.DEFAULT_TYP
     return
 
 
+async def edgy_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.edginessRanking(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 async def winstreaks_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     cmds = command.split(' ')
@@ -704,6 +714,7 @@ def start_bot(token, db_path):
 
     c_svergiconverters = CommandHandler("svergiconverters", partial(svergiconverters_command, path=db_path))
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
+    c_edgy = CommandHandler("edgy", partial(edgy_command, path=db_path))
 
     c_winstreaks = CommandHandler("winstreaks", partial(winstreaks_command, path=db_path))
     c_losestreaks = CommandHandler("losestreaks", partial(losestreaks_command, path=db_path))
@@ -749,6 +760,7 @@ def start_bot(token, db_path):
     application.add_handler(c_wincons)
     application.add_handler(c_svergiconverters)
     application.add_handler(c_svergitryers)
+    application.add_handler(c_edgy)
     application.add_handler(c_winstreaks)
     application.add_handler(c_losestreaks)
     # Run the bot until the user presses Ctrl-C
