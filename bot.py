@@ -10,9 +10,13 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 from functools import partial
+import csv
 import html
 import os
 import time
+
+# TEMP: to be removed later
+STICKER_LOG_PATH = '/tmp/sticker_ids.csv'
 
 import db
 import worker
@@ -36,6 +40,18 @@ _pending_new_season = {}
 _f_tracker = {}
 F_WINDOW_SECONDS = 5 * 60
 F_THRESHOLD = 4
+
+async def log_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sticker = update.message.sticker
+    user = update.message.from_user
+    with open(STICKER_LOG_PATH, 'a', newline='') as f:
+        csv.writer(f).writerow([
+            int(time.time()),
+            user.id,
+            user.username or user.first_name,
+            sticker.file_id,
+        ])
+
 
 async def log_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = update.effective_message
@@ -706,6 +722,7 @@ def start_bot(token, db_path):
     application.add_handler(MessageHandler(filters.COMMAND, partial(log_command, path=db_path)), group=-2)
     application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
+    application.add_handler(MessageHandler(filters.Sticker.ALL, log_sticker))
     application.add_handler(m)
     application.add_handler(m_f)
     application.add_handler(m_new_season)
