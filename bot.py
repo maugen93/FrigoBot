@@ -10,9 +10,13 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 from functools import partial
+import csv
 import html
 import os
 import time
+
+# TEMP: to be removed later
+STICKER_LOG_PATH = '/tmp/sticker_ids.csv'
 
 import db
 import worker
@@ -31,6 +35,23 @@ _troll_banned_until = {}
 
 # chat_id -> {"user_id": id of the superuser who closed the season, "from_frigo": first frigo of the new season}
 _pending_new_season = {}
+
+# chat_id -> {"senders": {user_id: mention_html}, "last_time": unix timestamp of last "F"}
+_f_tracker = {}
+F_WINDOW_SECONDS = 5 * 60
+F_THRESHOLD = 4
+
+async def log_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sticker = update.message.sticker
+    user = update.message.from_user
+    with open(STICKER_LOG_PATH, 'a', newline='') as f:
+        csv.writer(f).writerow([
+            int(time.time()),
+            user.id,
+            user.username or user.first_name,
+            sticker.file_id,
+        ])
+
 
 async def log_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     message = update.effective_message
@@ -78,6 +99,34 @@ async def troll_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ti ho appena registrato la tua merda di frigo, adesso te ne stai zitto")
         _troll_banned_until[user.id] = now + TROLL_BAN_SECONDS
         raise ApplicationHandlerStop
+
+
+async def f_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if chat.type not in ('group', 'supergroup'):
+        return
+
+    user = update.message.from_user
+    now = time.time()
+
+    state = _f_tracker.get(chat.id)
+    if state and now - state['last_time'] > F_WINDOW_SECONDS:
+        state = None
+
+    if state is None:
+        state = {'senders': {}, 'last_time': now}
+        _f_tracker[chat.id] = state
+
+    state['last_time'] = now
+    state['senders'][user.id] = user.mention_html(user.first_name)
+
+    if len(state['senders']) >= F_THRESHOLD:
+        tags = " ".join(state['senders'].values())
+        del _f_tracker[chat.id]
+        await update.message.reply_text(
+            'loggare {}'.format(tags), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+    return
 
 
 async def global_rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
@@ -613,6 +662,7 @@ def start_bot(token, db_path):
                        partial(handle_message, path=db_path))
     m_new_season = MessageHandler(filters.TEXT & ~filters.COMMAND,
                                    partial(new_season_name_message, path=db_path))
+    m_f = MessageHandler(filters.Regex(r'^F$') & filters.ChatType.GROUPS, f_message)
 
     c_week = CommandHandler("week", partial(week_command, path=db_path))
     c_animali = CommandHandler("animali", partial(animali_command, path=db_path))
@@ -672,7 +722,9 @@ def start_bot(token, db_path):
     application.add_handler(MessageHandler(filters.COMMAND, partial(log_command, path=db_path)), group=-2)
     application.add_handler(MessageHandler(filters.COMMAND, troll_guard), group=-1)
 
+    application.add_handler(MessageHandler(filters.Sticker.ALL, log_sticker))
     application.add_handler(m)
+    application.add_handler(m_f)
     application.add_handler(m_new_season)
     application.add_handler(c_week)
     application.add_handler(c_animali)

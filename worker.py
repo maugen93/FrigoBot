@@ -2,6 +2,7 @@ from datetime import datetime
 import difflib
 import html
 import random
+import numpy as np
 import graph
 import db
 import joks
@@ -31,6 +32,34 @@ def _formatDuration(seconds):
     return '{}s'.format(secs)
 
 
+def _durationOutlierMessage(duration_seconds, num_turns, past_durations):
+    '''Messaggio sulla durata, solo se la frigo è nel 5% più lento o più
+    veloce di sempre (percentile <=5 o >=95 su past_durations, che non
+    include la frigo corrente). Se batte il record assoluto lo segnala.'''
+    print(duration_seconds, past_durations)
+
+    if not past_durations:
+        return None
+
+    mm, ss = divmod(int(duration_seconds), 60)
+    p95 = np.percentile(past_durations, 95)
+    p5 = np.percentile(past_durations, 5)
+
+    if duration_seconds >= p95:
+        text = "Si è frigato per un totale esorbitante di {} minuti e {} secondi ({} turni)".format(mm, ss, num_turns)
+        if duration_seconds > max(past_durations):
+            text += ", nuovo record di lentezza di sempre! 🐌"
+        return text
+
+    if duration_seconds <= p5:
+        text = "Frigo speedrun, {} minuti e {} secondi ({} turni)".format(mm, ss, num_turns)
+        if duration_seconds < min(past_durations):
+            text += ", nuovo record di velocità di sempre! ⚡"
+        return text
+
+    return None
+
+
 def insertResult(db_path, sd_link):
     # check on link name
     if 'replay' not in sd_link:
@@ -44,7 +73,10 @@ def insertResult(db_path, sd_link):
         return "Replay già caricato"
 
     players, winner, poke_winner, num_turns, start_time, end_time = replay_reader.elab_sd_replay(sd_link)
-    duration = _formatDuration(end_time - start_time) if start_time is not None and end_time is not None else None
+    duration_seconds = end_time - start_time if start_time is not None and end_time is not None else None
+    duration = _formatDuration(duration_seconds) if duration_seconds is not None else None
+    print(duration, duration_seconds, len(db.getAllDurationsSeconds(c)))
+    past_durations = db.getAllDurationsSeconds(c)
 
     # controllo nick registrati
     for pid in list(players.keys()):
@@ -82,6 +114,11 @@ def insertResult(db_path, sd_link):
         # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
         message = message + '\n{}'.format(players[pid]['id'])
     message = message + '\n\n' + joks.messForWinnerOnReg(winner_name, poke_winner)
+
+    if duration_seconds is not None:
+        duration_alert = _durationOutlierMessage(duration_seconds, num_turns, past_durations)
+        if duration_alert:
+            message = message + '\n\n' + duration_alert
 
     top5_alert = _closeToTop5Message(c)
     if top5_alert:
@@ -684,7 +721,12 @@ def _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo):
     message = '\nPlayer insights di stagione (min 10 frigo):\n'
     message = message + '🎯 Best winrate: {} (<code>{:.1f}%</code>)[{}]\n'.format(best_winrate_player, best_winrate, best_winrate_games)
     message = message + '🧮 Best MarvWr: {} (<code>{}</code>)[{}]\n'.format(best_marvwr_player, best_marvwr, best_marvwr_games)
-    message = message + '👑 Max vittorie: {} (<code>{}</code>)[{}]\n\n'.format(best_wins_player, best_wins, best_wins_games)
+    message = message + '👑 Max vittorie: {} (<code>{}</code>)[{}]\n'.format(best_wins_player, best_wins, best_wins_games)
+
+    best_contributor_idx = partecipate.index(max(partecipate))
+    message = message + '👟 Maggior contribuente: {} (<code>{}</code>)\n\n'.format(
+        players[best_contributor_idx], partecipate[best_contributor_idx]
+    )
 
     cessi_stats = db.getCessiWinconStatsForRange(conn, from_frigo, to_frigo)
     if cessi_stats:
@@ -703,7 +745,14 @@ def _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo):
     else:
         message = message + '🔞 Nessun cesso sverginato questa siso...\n'
 
-
+    top_winconed = db.getTopWinconedMonsWithRateForRange(conn, from_frigo, to_frigo, limit=5)
+    if top_winconed:
+        message = message + '\n🦴 Animali più winconati in siso:\n'
+        for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top_winconed, 1):
+            pct = wincon_cnt / spawn_cnt * 100 if spawn_cnt else 0
+            message = message + '{}) {} (<code>{}/{} - {:.0f}%</code>)\n'.format(
+                i, mon, wincon_cnt, spawn_cnt, pct
+            )
 
     p1, p2, p3, p4, match_winners, _, progr, replay_link = db.getFrigoFromTo(conn, from_frigo, to_frigo)
     streaks = _seasonStreaksAndSwaps(players, p1, p2, p3, p4, match_winners, progr, replay_link)
@@ -711,11 +760,11 @@ def _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo):
     message = message + '\n'
     if streaks['win_streak_player']:
         match_list = _formatWinStreakMatches(streaks['win_streak_matches'])
-        message = message + '🔥 Win streak più lunga: {} (<code>{}</code>){}\n'.format(
+        message = message + '🔥 Win streak più lunga: {} (<code>{}</code>)\n        {}\n'.format(
             streaks['win_streak_player'], streaks['win_streak'], match_list
         )
     if streaks['secchezza_streak_player']:
-        message = message + '🏜️ Secchezza più lunga: {} (<code>{}</code>)\n'.format(
+        message = message + '🏜️ Secchezza maggiore: {} (<code>{}</code>)\n'.format(
             streaks['secchezza_streak_player'], streaks['secchezza_streak']
         )
     if streaks['swap_pair'] and streaks['swap_count'] > 3:
@@ -1368,7 +1417,7 @@ def closeWeek(db_path):
     else:
         message = message + '📊<code>{0:.2f}</code> frigo al giorno '.format(differenziale)
     message = message + 'rispetto a settimana <code>{}</code>\n\n'.format(w[-2])
-    message = message + '🏃‍♂️‍➡️Maggior contribuente: {} (<code>{}</code>)'.format(players[partecipate.index(max(partecipate))],
+    message = message + '👟 Maggior contribuente: {} (<code>{}</code>)'.format(players[partecipate.index(max(partecipate))],
                                                                       max(partecipate))
 
     db.closeDbConn(conn)

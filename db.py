@@ -241,6 +241,16 @@ def setTimestamps(conn, progr, start_time, end_time, duration):
     return cur.rowcount
 
 
+def getAllDurationsSeconds(conn):
+    '''Durata (end_time-start_time, secondi) di tutte le frigo con timestamp
+    salvati, per il confronto percentile/record in worker.insertResult.'''
+    cur = conn.execute("SELECT start_time, end_time FROM frigos "
+                        "WHERE start_time IS NOT NULL AND end_time IS NOT NULL")
+    result = [end - start for start, end in cur.fetchall()]
+    cur.close()
+    return result
+
+
 def getFrigosToBackfillTurns(conn, frigo_nrs=None):
     '''Frigo con replay ma senza turns salvato (caricate prima che la colonna
     esistesse). Con frigo_nrs esplicito rilegge anche quelle già marcate, per
@@ -1291,4 +1301,24 @@ def getTopWinconedMonsForRange(conn, from_frigo, to_frigo, limit=10):
         GROUP BY s.spawn
         ORDER BY wincon_cnt DESC
         LIMIT ?''', (from_frigo, to_frigo, limit))
+    return cur.fetchall()
+
+
+def getTopWinconedMonsWithRateForRange(conn, from_frigo, to_frigo, limit=5):
+    '''I `limit` animali scelti più spesso come wincon (spawns.winconato) tra le frigo
+    con progr tra from_frigo e to_frigo (inclusi), insieme al numero di volte in cui
+    sono stati spawnati in totale nello stesso intervallo. Ritorna una lista di tuple
+    (spawn, wincon_cnt, spawn_cnt), ordinata per wincon_cnt decrescente.'''
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT spawn,
+               SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END) AS wincon_cnt,
+               COUNT(*) AS spawn_cnt
+        FROM spawns
+        WHERE frigo BETWEEN ? AND ?
+        GROUP BY spawn
+        HAVING wincon_cnt > 0
+        ORDER BY wincon_cnt DESC
+        LIMIT ?
+    ''', (from_frigo, to_frigo, limit))
     return cur.fetchall()

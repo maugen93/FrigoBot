@@ -106,11 +106,11 @@ def siso_progression(progression, path, season_name):
     for (name, values), label_y in zip(highlighted, label_ys):
         color = PLAYER_COLORS.get(name, DEFAULT_PLAYER_COLOR)
         ax.text(x[-1] + x[-1] * 0.02 + 0.3, label_y, name, color=color,
-                 fontsize=10, fontweight='bold', va='center', ha='left',
+                 fontsize=10, va='center', ha='left',
                  fontfamily=CUSTOM_FONT_NAME)
 
     ax.set_title('Andamento Siso — {}'.format(season_name), color=SISO_INK_PRIMARY,
-                  fontsize=14, fontweight='bold', loc='left', pad=14,
+                  fontsize=14, loc='left', pad=14,
                   fontfamily=CUSTOM_FONT_NAME)
     ax.set_xlabel('Frigo giocate in stagione', color=SISO_INK_MUTED, fontsize=9,
                   fontfamily=CUSTOM_FONT_NAME)

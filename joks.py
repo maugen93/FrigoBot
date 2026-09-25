@@ -68,10 +68,11 @@ def commentoStagioneVittoria(category):
         'dominio': [
             "👑 Dominata dall'inizio alla fine",
             "👑 Stagione a senso unico",
+            "👑 Zero competizione per tutta la siso",
         ],
         'furto': [
-            "🥷 Rubata a fine siso",
-            "🥷 Zitto zitto ruba la siso",
+            "🥷 Rubata la siso a fine corsa",
+            "🥷 Zitto zitto ruba la siso con un colpo di reni",
             "🥷 Colpo di stato nelle ultime frigo",
         ],
         'misura': [
@@ -80,9 +81,9 @@ def commentoStagioneVittoria(category):
             "📏 Si separa per un nonnulla",
         ],
         'schiacciante': [
-            "💪 Distrutti tutti i contendenti",
-            "💪 Vittoria schiacciante",
-            "💪 Margine imbarazzante sul secondo",
+            "🪨 Distrutti tutti i contendenti",
+            "🪨 Vittoria schiacciante",
+            "🪨 Margine imbarazzante sul secondo",
         ],
         'normale': [
             "📈 Vittoria solida e di sostanza",
