@@ -90,14 +90,29 @@ def save_hist(x, y, path, current_week=None, week_start_dates=None, week_duratio
         ax.bar(plot_x, plot_y, width=0.8, color=plot_colors, alpha=0.75, zorder=2)
         ax.xaxis.set_major_locator(MaxNLocator(integer=True, min_n_ticks=1))
         if week_durations:
-            for week, days in week_durations:
-                if days <= 8 or (n_weeks is not None and not (first_week <= week <= end_week)):
-                    continue
+            annotations = [
+                (week, days) for week, days in sorted(week_durations)
+                if days > 8 and (n_weeks is None or first_week <= week <= end_week)
+            ]
+            annotation_weeks = {week for week, _ in annotations}
+            for week, days in annotations:
+                # Consecutive long weeks share the space above the bars. Alternate
+                # their labels between above and inside the bin to keep them clear.
+                run_start = week
+                while run_start - 1 in annotation_weeks:
+                    run_start -= 1
+                inside = (week - run_start) % 2 == 1
                 count = np.interp(week, x_np, y_np)
-                ax.annotate('{}gg'.format(days), xy=(week, count), xytext=(0, 5),
-                            textcoords='offset points', ha='center', va='bottom',
-                            fontsize=7, color=SISO_INK_MUTED,
-                            fontfamily=CUSTOM_FONT_NAME, zorder=4)
+                if inside:
+                    ax.annotate('{}gg'.format(days), xy=(week, count), xytext=(-1, -4),
+                                textcoords='offset points', ha='center', va='top',
+                                rotation=90, fontsize=7, color=SISO_INK_MUTED_2,
+                                fontfamily=CUSTOM_FONT_NAME, zorder=4)
+                else:
+                    ax.annotate('{}gg'.format(days), xy=(week, count), xytext=(-1, 5),
+                                textcoords='offset points', ha='center', va='bottom',
+                                rotation=90, fontsize=7, color=SISO_INK_MUTED_2,
+                                fontfamily=CUSTOM_FONT_NAME, zorder=4)
         if legend_handles:
             ax.legend(handles=legend_handles, frameon=False, labelcolor=SISO_INK_MUTED,
                       fontsize=8)
@@ -194,6 +209,7 @@ MAX_HIGHLIGHTED = 8
 SISO_SURFACE = "#ededde"
 SISO_INK_PRIMARY = "#242424"
 SISO_INK_MUTED = "#637C83"
+SISO_INK_MUTED_2 = "#857457"
 SISO_GRID = '#e1e0d9'
 SISO_BASELINE = '#c3c2b7'
 SISO_BG_LINE = '#c3c2b7'
