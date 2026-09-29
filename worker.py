@@ -210,7 +210,18 @@ def frigoInfo(frigo_nr, db_path):
     for player, pokemon in wincons:
         wincons_by_player.setdefault(player, []).append(pokemon)
 
-    message = "Frigo # <code>{}</code>\n\n".format(frigo['progr'])
+    frigo_date = frigo['date']
+    if frigo_date:
+        try:
+            parsed_date = datetime.strptime(frigo_date, '%d/%m/%y')
+            month = ('Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.',
+                     'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.')[parsed_date.month - 1]
+            frigo_date = '{} {}, {}'.format(month, parsed_date.day, parsed_date.year)
+        except ValueError:
+            pass
+    message = "Frigo # <code>{}</code>{}\n\n".format(
+        frigo['progr'], ' ({})'.format(html.escape(frigo_date)) if frigo_date else ''
+    )
     player_width = max((len(p) for p in players), default=0)
     player_rows = []
     for p in players:
