@@ -142,6 +142,23 @@ async def animali_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
 
 
 async def season_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    if context.args:
+        selector = ' '.join(context.args)
+        result, error = worker.sisoDetails(path, selector)
+        if error:
+            await update.message.reply_text(
+                error, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+            )
+            return
+        message, plot_path, caption = result
+        await update.message.reply_text(
+            message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        await update.message.reply_photo(
+            plot_path, caption=caption, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
     await update.message.reply_text(
         worker.rank_season(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
@@ -510,7 +527,7 @@ COMMAND_SECTIONS = [
     ("📊 Classifiche", [
         ("week", "classifica settimana in corso"),
         ("global", "classifica all time"),
-        ("season / siso", "classifica stagione in corso"),
+        ("season / siso [numero|nome]", "classifica stagione in corso; con numero o nome mostra risultato e grafico di una siso"),
         ("score", "classifica per punteggio MarvWr"),
         ("califfi", "albo d'oro califfi"),
         ("swingers", "giocatori più altalenanti di settimana in settimana"),

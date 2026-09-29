@@ -829,6 +829,14 @@ def getCurrentSeason(conn):
     return cur.fetchone()
 
 
+def getSeasons(conn):
+    '''Tutte le stagioni in ordine cronologico: nome, limiti frigo, vincitore.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT stagione, from_frigo, to_frigo, winner
+                   FROM stagioni ORDER BY from_frigo''')
+    return cur.fetchall()
+
+
 def closeSeason(conn, stagione, to_frigo, winner):
     conn.execute("UPDATE stagioni SET to_frigo=?, winner=? WHERE stagione=?",
                  (to_frigo, winner, stagione))
