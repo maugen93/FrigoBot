@@ -226,7 +226,7 @@ def frigoInfo(frigo_nr, db_path):
     player_rows = []
     for p in players:
         if p == frigo['winner']:
-            marker = '·'
+            marker = '⁎'
         else:
             marker = ' '
         pokemon = wincons_by_player.get(p)
