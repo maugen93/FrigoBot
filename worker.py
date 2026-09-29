@@ -222,12 +222,13 @@ def frigoInfo(frigo_nr, db_path):
     message = "Frigo # <code>{}</code>{}\n\n".format(
         frigo['progr'], ' ({})'.format(html.escape(frigo_date)) if frigo_date else ''
     )
-    player_widths = {p: max((len('{} {}',p)), default=0) for p in players}
+    max_width = max((len(p) for p in players), default=0)
+    player_widths = {p: max_width for p in players}
     player_rows = []
     for p in players:
         if p == frigo['winner']:
             marker = '★'
-            player_widths[p] -= 1
+            player_widths[p] = player_widths[p] - 1
         else:
             marker = '·'
         pokemon = wincons_by_player.get(p)
