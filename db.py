@@ -717,6 +717,27 @@ def getNumberOfFrigoPerWeek(conn):
     return w, f
 
 
+def getWeekStartDates(conn):
+    cur = conn.cursor()
+    cur.execute('select week,startdate from weeks where startdate is not null')
+    return cur.fetchall()
+
+
+def getWeekDurations(conn):
+    cur = conn.cursor()
+    cur.execute('''SELECT week, startdate, enddate FROM weeks
+                   WHERE startdate IS NOT NULL AND enddate IS NOT NULL''')
+    durations = []
+    for week, startdate, enddate in cur.fetchall():
+        try:
+            start = datetime.strptime(startdate, '%d/%m/%y')
+            end = datetime.strptime(enddate, '%d/%m/%y')
+        except (TypeError, ValueError):
+            continue
+        durations.append((week, (end - start).days))
+    return durations
+
+
 def getRatingPlayer(conn, player):
     cur = conn.cursor()
     rating = None

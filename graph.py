@@ -1,9 +1,12 @@
+from datetime import datetime
 import os
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from scipy.interpolate import make_interp_spline
+from matplotlib.patches import Patch
+from matplotlib.ticker import MaxNLocator
+from scipy.ndimage import gaussian_filter1d
 
 import polars as pl
 
@@ -13,26 +16,150 @@ CUSTOM_FONT_NAME = fm.FontProperties(fname=FONT_PATH).get_name()
 plt.rcParams['font.family'] = CUSTOM_FONT_NAME
 
 
-def save_hist(x, y, path):
-    x_np = np.array(x)
-    y_np = np.array(y)
+def save_hist(x, y, path, current_week=None, week_start_dates=None, week_durations=None,
+              n_weeks=None):
+    x_np = np.asarray(x, dtype=float)
+    y_np = np.asarray(y, dtype=float)
 
-    # max_index=np.argmax(x_np)
-    # x_np=np.delete(x_np,max_index)
-    # y_np=np.delete(y_np,max_index)
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=150)
+    fig.patch.set_facecolor(SISO_SURFACE)
+    ax.set_facecolor(SISO_SURFACE)
 
-    plt.bar(x_np, y_np, width=1, color='blue', alpha=0.7)
+    if len(x_np):
+        order = np.argsort(x_np)
+        x_np, y_np = x_np[order], y_np[order]
+        colors = [SISO_BASELINE] * len(x_np)
+        legend_handles = []
 
-    x_s = np.linspace(x_np.min(), x_np.max(), 300)
-    spl = make_interp_spline(x_np, y_np, k=2)
-    y_s = spl(x_s)
+        # Keep the current week's bar out of the trend and color coding: it is
+        # still in progress and its count is not comparable to completed weeks.
+        trend_mask = np.ones(len(x_np), dtype=bool)
+        if current_week is not None:
+            trend_mask &= x_np != current_week
+        trend_x, trend_y = x_np[trend_mask], y_np[trend_mask]
+        if len(trend_x) > 1:
+            order = np.argsort(trend_x)
+            trend_x, trend_y = trend_x[order], trend_y[order]
+            # Interpolate onto a dense weekly timeline, then blur by roughly 1.5
+            # weeks. Unlike a spline through every bar, this reveals the broad trend.
+            x_s = np.linspace(trend_x.min(), trend_x.max(), max(300, len(trend_x) * 30))
+            y_s = np.interp(x_s, trend_x, trend_y)
+            samples_per_week = (len(x_s) - 1) / max(trend_x.max() - trend_x.min(), 1)
+            y_s = gaussian_filter1d(y_s, sigma=max(samples_per_week * 1.5, 1), mode='nearest')
+            # Smooth and classify against the complete history even when only
+            # the latest weeks are shown.
+            if n_weeks is not None:
+                end_week = current_week if current_week is not None else x_np.max()
+                first_week = end_week - n_weeks + 1
+                trend_visible = (x_s >= first_week) & (x_s <= end_week)
+                plot_x_s, plot_y_s = x_s[trend_visible], y_s[trend_visible]
+            else:
+                plot_x_s, plot_y_s = x_s, y_s
+            ax.plot(plot_x_s, plot_y_s, color='#5e8fa8', linewidth=2.5,
+                    solid_capstyle='round', zorder=3, label='Andazzo smussato')
 
-    plt.plot(x_s, y_s, 'r-')
-    plt.xlabel('Weeks')
-    plt.ylabel('F')
+            trend_at_weeks = np.interp(x_np, x_s, y_s)
+            good, bad = '#a8c9ad', '#d9aaa3'
+            for i, (week, count, baseline) in enumerate(zip(x_np, y_np, trend_at_weeks)):
+                if current_week is not None and week == current_week:
+                    continue
+                margin = max(2, baseline * 0.25)
+                if count >= baseline + margin:
+                    colors[i] = good
+                elif count <= baseline - margin:
+                    colors[i] = bad
 
-    plt.savefig(path)
-    plt.close()
+            if good in colors:
+                legend_handles.append(Patch(facecolor=good, label='Settimana buona'))
+            if bad in colors:
+                legend_handles.append(Patch(facecolor=bad, label='Settimana fiacca'))
+            legend_handles.append(plt.Line2D([], [], color='#5e8fa8', linewidth=2.5,
+                                             label='Andazzo smussato'))
+
+        if n_weeks is not None:
+            end_week = current_week if current_week is not None else x_np.max()
+            first_week = end_week - n_weeks + 1
+            visible = (x_np >= first_week) & (x_np <= end_week)
+            plot_x, plot_y = x_np[visible], y_np[visible]
+            plot_colors = [color for color, keep in zip(colors, visible) if keep]
+            ax.set_xlim(first_week - 0.5, end_week + 0.5)
+        else:
+            plot_x, plot_y, plot_colors = x_np, y_np, colors
+            ax.set_xlim(x_np.min() - 0.5, x_np.max() + 0.5)
+
+        ax.bar(plot_x, plot_y, width=0.8, color=plot_colors, alpha=0.75, zorder=2)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True, min_n_ticks=1))
+        if week_durations:
+            for week, days in week_durations:
+                if days <= 8 or (n_weeks is not None and not (first_week <= week <= end_week)):
+                    continue
+                count = np.interp(week, x_np, y_np)
+                ax.annotate('{}gg'.format(days), xy=(week, count), xytext=(0, 5),
+                            textcoords='offset points', ha='center', va='bottom',
+                            fontsize=7, color=SISO_INK_MUTED,
+                            fontfamily=CUSTOM_FONT_NAME, zorder=4)
+        if legend_handles:
+            ax.legend(handles=legend_handles, frameon=False, labelcolor=SISO_INK_MUTED,
+                      fontsize=8)
+        # Mark each quarter's first available visible week, using Italian month names.
+        if week_start_dates:
+            month_names = ('Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+                           'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic')
+            quarter_ticks = []
+            seen_quarters = set()
+            for week, start_date in sorted(week_start_dates):
+                if n_weeks is not None and not (first_week <= week <= end_week):
+                    continue
+                try:
+                    date = datetime.strptime(start_date, '%d/%m/%y')
+                except (TypeError, ValueError):
+                    continue
+                quarter = (date.year, (date.month - 1) // 3)
+                if quarter in seen_quarters:
+                    continue
+                seen_quarters.add(quarter)
+                quarter_month = quarter[1] * 3 + 1
+                quarter_ticks.append((week, '{}-{:02d}'.format(
+                    month_names[quarter_month - 1], date.year % 100
+                )))
+            if quarter_ticks:
+                tick_weeks, tick_labels = zip(*quarter_ticks)
+                quarter_ax = ax.twiny()
+                quarter_ax.set_xlim(ax.get_xlim())
+                quarter_ax.set_xticks(tick_weeks)
+                quarter_ax.set_xticklabels(tick_labels, rotation=90, ha='center', va='top')
+                quarter_ax.xaxis.set_ticks_position('bottom')
+                quarter_ax.xaxis.set_label_position('bottom')
+                quarter_ax.spines['bottom'].set_position(('outward', 34))
+                quarter_ax.spines['bottom'].set_color(SISO_BASELINE)
+                quarter_ax.spines['top'].set_visible(False)
+                quarter_ax.patch.set_visible(False)
+                quarter_ax.tick_params(axis='x', colors=SISO_INK_MUTED, labelsize=8,
+                                       length=0, pad=3)
+                for label in quarter_ax.get_xticklabels():
+                    label.set_rotation(90)
+                    label.set_fontfamily(CUSTOM_FONT_NAME)
+
+    ax.set_title('Andazzo — frigo giocate per settimana', color=SISO_INK_PRIMARY,
+                 fontsize=14, loc='left', pad=14, fontfamily=CUSTOM_FONT_NAME)
+    ax.set_xlabel('Settimane', color=SISO_INK_MUTED, fontsize=9, fontfamily=CUSTOM_FONT_NAME)
+    ax.xaxis.set_label_coords(0.5, -0.29 if week_start_dates else -0.08)
+    ax.set_ylabel('Frigo giocate', color=SISO_INK_MUTED, fontsize=9, fontfamily=CUSTOM_FONT_NAME)
+    ax.grid(axis='y', color=SISO_GRID, linewidth=0.8, zorder=0)
+    ax.grid(axis='x', visible=False)
+    for spine in ('top', 'right', 'left'):
+        ax.spines[spine].set_visible(False)
+    ax.spines['bottom'].set_color(SISO_BASELINE)
+    ax.spines['bottom'].set_linewidth(0.8)
+    ax.tick_params(axis='both', colors=SISO_INK_MUTED, labelsize=8, length=0)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontfamily(CUSTOM_FONT_NAME)
+
+    fig.tight_layout()
+    if week_start_dates:
+        fig.subplots_adjust(bottom=0.24)
+    plt.savefig(path, facecolor=SISO_SURFACE)
+    plt.close(fig)
 
 
 PLAYER_COLORS = {
@@ -66,7 +193,7 @@ MAX_HIGHLIGHTED = 8
 
 SISO_SURFACE = "#ededde"
 SISO_INK_PRIMARY = "#242424"
-SISO_INK_MUTED = '#898781'
+SISO_INK_MUTED = "#637C83"
 SISO_GRID = '#e1e0d9'
 SISO_BASELINE = '#c3c2b7'
 SISO_BG_LINE = '#c3c2b7'

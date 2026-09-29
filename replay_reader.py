@@ -23,6 +23,9 @@ Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment
     s = re.sub(r'\(fainted\)$', '', s)
     match = re.search(r'\(([^)]+)\)', s)
     s = match.group(1) if match else s
+    s = s.strip()
+    if s.casefold() == 'ogerpon-teal':
+        return 'Ogerpon'
     if s not in NON_COSMETIC_FORMS:
         s = re.sub(rf'\-({ALT_FORMS})$', '', s)
     for ot_n in other_animals:

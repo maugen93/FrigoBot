@@ -475,10 +475,26 @@ async def secchezza_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 
 async def andazzo_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
-    plot_path = worker.frigoFrequency(path)
+    n_weeks = None
+    if context.args:
+        arg = context.args[0].lower()
+        if arg == 'all':
+            if len(context.args) > 1:
+                await update.message.reply_text('Troppi. Uno solo, ugh.', reply_markup=ReplyKeyboardRemove())
+                return
+        else:
+            try:
+                n_weeks = int(arg)
+                if n_weeks < 1 or len(context.args) > 1:
+                    raise ValueError
+            except ValueError:
+                await update.message.reply_text('Numero o all. Tu scrivi chiaro.', reply_markup=ReplyKeyboardRemove())
+                return
+
+    plot_path = worker.frigoFrequency(path, n_weeks=n_weeks)
 
     await update.message.reply_photo(
-        plot_path, caption='Numero di Frigo fatte per week', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        plot_path, caption='Frigo per settimana. Ugh.', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
     return
 
@@ -523,7 +539,7 @@ COMMAND_SECTIONS = [
     ]),
     ("🧊 Altro", [
         ("frigo &lt;numero&gt;", "dettagli di una frigo specifica"),
-        ("andazzo", "grafico frigo giocate per settimana"),
+        ("andazzo [numero|all]", "grafico frigo giocate per settimana"),
         ("calc", "link al damage calc di Showdown"),
         ("ladder", "vedi tu"),
         ("comandi", "vedi questa lista tipo?"),
