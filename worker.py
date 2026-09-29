@@ -222,21 +222,22 @@ def frigoInfo(frigo_nr, db_path):
     message = "Frigo # <code>{}</code>{}\n\n".format(
         frigo['progr'], ' ({})'.format(html.escape(frigo_date)) if frigo_date else ''
     )
-    player_width = max((len(p) for p in players), default=0)
+    player_width = max((len('{} {}'.format('★' if p == frigo['winner'] else '', p))
+                        for p in players), default=0)
     player_rows = []
     for p in players:
         if p == frigo['winner']:
             marker = '★'
-            player_width -= 1
         else:
             marker = ''
         pokemon = wincons_by_player.get(p)
         pokemon_text = ', '.join(pokemon) if pokemon else 'Wincon non registrata'
-        player_rows.append('{} {}  │  {}'.format(
-            marker, html.escape(p.ljust(player_width)), html.escape(pokemon_text)
+        player_column = '{} {}'.format(marker, p).ljust(player_width)
+        player_rows.append('<code>{}  │  {}</code>'.format(
+            html.escape(player_column), html.escape(pokemon_text)
         ))
     if player_rows:
-        message += '<pre>{}</pre>'.format('\n'.join(player_rows))
+        message += '{}'.format('\n'.join(player_rows))
     if any(p is None for p in (frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4'])):
         message = message + '\n\n(frigo dell\'età della pietra, dati parziali)\n'
 
