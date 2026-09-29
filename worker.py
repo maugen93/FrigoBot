@@ -229,7 +229,7 @@ def frigoInfo(frigo_nr, db_path):
         if p == frigo['winner']:
             marker = '★'
         else:
-            marker = ''
+            marker = '·'
         pokemon = wincons_by_player.get(p)
         pokemon_text = ', '.join(pokemon) if pokemon else 'Wincon non registrata'
         player_column = '{} {}'.format(marker, p).ljust(player_width)
