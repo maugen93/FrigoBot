@@ -225,7 +225,11 @@ def frigoInfo(frigo_nr, db_path):
     player_width = max((len(p) for p in players), default=0)
     player_rows = []
     for p in players:
-        marker = '★' if p == frigo['winner'] else ' '
+        if p == frigo['winner']:
+            marker = '★'
+            player_width -= 1
+        else:
+            marker = ''
         pokemon = wincons_by_player.get(p)
         pokemon_text = ', '.join(pokemon) if pokemon else 'Wincon non registrata'
         player_rows.append('{} {}  │  {}'.format(
@@ -237,7 +241,6 @@ def frigoInfo(frigo_nr, db_path):
         message = message + '\n\n(frigo dell\'età della pietra, dati parziali)\n'
 
     if frigo['sd_replay']:
-
         message = message + '\n\n<a href="{}">&lt;clicca-qui-per-il-replay&gt;</a>'.format(html.escape(frigo['sd_replay'], quote=True))
 
     return message
