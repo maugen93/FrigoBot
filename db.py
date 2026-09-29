@@ -365,6 +365,14 @@ def isSDReplayAlreadyLoaded(conn, sd_link):
     return exists
 
 
+def getWinconsForFrigo(conn, frigo_nr):
+    """Wincon registrate per giocatore in una frigo, come lista di (player, pokemon)."""
+    cur = conn.cursor()
+    cur.execute("SELECT player, spawn FROM spawns WHERE frigo=? AND winconato=1 ORDER BY player, spawn",
+                (frigo_nr,))
+    return cur.fetchall()
+
+
 def getFrigoInfoFromNumber(conn, frigo_nr):
     cur = conn.cursor()
     cur.execute("SELECT * FROM frigos WHERE progr=?", (frigo_nr,))

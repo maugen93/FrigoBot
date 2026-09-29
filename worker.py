@@ -199,20 +199,31 @@ def cancelLastFrigo(db_path, progr):
 def frigoInfo(frigo_nr, db_path):
     conn = db.openDbConn(db_path)
     frigo = db.getFrigoInfoFromNumber(conn, frigo_nr)
+    wincons = db.getWinconsForFrigo(conn, frigo_nr) if frigo else []
     db.closeDbConn(conn)
 
     if not frigo:
         return "Se magari mi dessi una frigo non inventata"
 
-    players = [frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']]
+    players = [p for p in (frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4']) if p]
+    wincons_by_player = {}
+    for player, pokemon in wincons:
+        wincons_by_player.setdefault(player, []).append(pokemon)
 
-    message = "Frigo # <code>{}</code>".format(frigo['progr'])
+    message = "Frigo # <code>{}</code>\n\n".format(frigo['progr'])
+    player_width = max((len(p) for p in players), default=0)
+    player_rows = []
     for p in players:
-        if p:
-            message = message + '\n{}'.format(p)
-    if any(p is None for p in players):
+        marker = '★' if p == frigo['winner'] else ' '
+        pokemon = wincons_by_player.get(p)
+        pokemon_text = ', '.join(pokemon) if pokemon else 'Wincon non registrata'
+        player_rows.append('{} {}  │  {}'.format(
+            marker, html.escape(p.ljust(player_width)), html.escape(pokemon_text)
+        ))
+    if player_rows:
+        message += '<pre>{}</pre>'.format('\n'.join(player_rows))
+    if any(p is None for p in (frigo['p1'], frigo['p2'], frigo['p3'], frigo['p4'])):
         message = message + '\n\n(frigo dell\'età della pietra, dati parziali)\n'
-    message = message + '\n' + joks.messForWinnerOnReg(frigo['winner'], frigo['pokewinner'], seed=frigo['progr'])
 
     if frigo['sd_replay']:
 
