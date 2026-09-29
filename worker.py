@@ -222,7 +222,7 @@ def frigoInfo(frigo_nr, db_path):
     message = "Frigo # <code>{}</code>{}\n\n".format(
         frigo['progr'], ' ({})'.format(html.escape(frigo_date)) if frigo_date else ''
     )
-    player_width = max((len('{} {}'.format('★' if p == frigo['winner'] else '·', p))
+    player_width = max((len('{} {}'.format('★' if p == frigo['winner'] else '  ', p))
                         for p in players), default=0)
     player_rows = []
     for p in players:
