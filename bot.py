@@ -365,6 +365,13 @@ async def cal_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     return
 
 
+async def sisos_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    await update.message.reply_text(
+        worker.sisoHallOfFame(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 async def animale_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     cmds = command.split(' ')
@@ -528,6 +535,7 @@ COMMAND_SECTIONS = [
         ("week", "classifica settimana in corso"),
         ("global", "classifica all time"),
         ("season / siso [numero|nome]", "classifica stagione in corso; con numero o nome mostra risultato e grafico di una siso"),
+        ("sisos", "albo d'oro delle siso"),
         ("score", "classifica per punteggio MarvWr"),
         ("califfi", "albo d'oro califfi"),
         ("swingers", "giocatori più altalenanti di settimana in settimana"),
@@ -702,6 +710,7 @@ def start_bot(token, db_path):
     c_season2 = CommandHandler("siso", partial(season_command, path=db_path))
     c_sisograph = CommandHandler("sisograph", partial(sisograph_command, path=db_path))
     c_califfi = CommandHandler("califfi", partial(cal_command, path=db_path))
+    c_sisos = CommandHandler("sisos", partial(sisos_command, path=db_path))
     c_score = CommandHandler("score", partial(score_command, path=db_path))
     c_animale = CommandHandler("animale", partial(animale_command, path=db_path))
     c_global = CommandHandler("global", partial(global_rank_command, path=db_path))
@@ -764,6 +773,7 @@ def start_bot(token, db_path):
     application.add_handler(c_season2)
     application.add_handler(c_sisograph)
     application.add_handler(c_califfi)
+    application.add_handler(c_sisos)
     application.add_handler(c_score)
     application.add_handler(c_query)
     application.add_handler(c_tag)

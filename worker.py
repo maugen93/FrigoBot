@@ -1682,6 +1682,33 @@ def topWincons(db_path, limit=10):
     return message
 
 
+def sisoHallOfFame(db_path):
+    conn = db.openDbConn(db_path)
+    seasons = db.getSeasons(conn)
+    db.closeDbConn(conn)
+
+    titles = {}
+    for season, _, to_frigo, winner in seasons:
+        if to_frigo is not None and winner:
+            titles.setdefault(winner, []).append(season)
+
+    if not titles:
+        return "Non è ancora stata chiusa nessuna siso."
+
+    ranking = sorted(titles.items(), key=lambda item: (-len(item[1]), item[1][0].casefold()))
+    message = "Albo d'oro siso\n\n"
+    rank_width = len(str(len(ranking)))
+    name_width = max(len(player) for player, _ in ranking)
+    count_width = max(len(str(len(won_seasons))) for _, won_seasons in ranking)
+
+    for rank, (player, won_seasons) in enumerate(ranking, 1):
+        message += '<code>{:>{}}) {:<{}} {:>{}}</code> — {}\n'.format(
+            rank, rank_width, html.escape(player), name_width, len(won_seasons), count_width,
+            ', '.join(html.escape(season) for season in won_seasons)
+        )
+    return message
+
+
 def calippi(db_path):
     c = db.openDbConn(db_path)
     califfi = db.getCaliffi(c)
