@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import calendar
 import difflib
 import html
 import random
@@ -290,42 +291,42 @@ def rank_all(db_path):
     return message
 
 
+def _displaySeasonDates(startdate, enddate):
+    return '{} – {}'.format(startdate or 'n/d', enddate or 'n/d')
+
+
+def _sisoRows(players, wins, partecipate):
+    return sorted(
+        ((p, wins[i] * 5 - (partecipate[i] - wins[i]), wins[i], partecipate[i])
+         for i, p in enumerate(players)),
+        key=lambda row: row[1], reverse=True
+    )
+
+
 def rank_season(db_path):
-    # return 'Ma che siso e siso, le frigo sono morte'
     c = db.openDbConn(db_path)
-    current_season = db.getCurrentSeason(c)
-    if current_season is None:
+    current = db.getCurrentSeason(c)
+    if current is None:
         db.closeDbConn(c)
         return 'Non c\'è nessuna siso in corso.'
-    season, from_frigo = current_season
+    season, from_frigo = current
+    to_frigo = db.getNumberOfFrigos(c)
     players, wins, partecipate = db.getPlayerLeaderboard(
-        c, from_frigo=from_frigo, to_frigo=db.getNumberOfFrigos(c)
+        c, from_frigo=from_frigo, to_frigo=to_frigo
     )
-    message = 'Classifica {} Siso\n\n'.format(html.escape(season or 'in corso'))
-
-    players_dict_arr=[]
-    for i in range(len(players)):
-        player_dict={'player':players[i],'wins':wins[i],'part':partecipate[i],
-                     '5-1':(wins[i] * 5 - (partecipate[i] -wins[i]))
-                     }
-        players_dict_arr.append(player_dict)
-    ordinati = sorted(players_dict_arr, key=lambda x: x["5-1"], reverse=True)
-
-    rank_width = len(str(len(ordinati)))
-    name_width = max((len(o['player']) for o in ordinati), default=0)
-    score_width = max((len(str(o['5-1'])) for o in ordinati), default=1)
-    wins_width = max((len(str(o['wins'])) for o in ordinati), default=1)
-    part_width = max((len(str(o['part'])) for o in ordinati), default=1)
-
-    for i in range(len(ordinati)):
-        message = message + "<code>{rank:>{rw}}) {name:<{nw}} {score:>{sw}}  [{wins:>{ww}}/{part:>{pw}}]</code>\n".format(
-            rank=i + 1, name=ordinati[i]['player'], score=ordinati[i]['5-1'],
-            wins=ordinati[i]['wins'], part=ordinati[i]['part'],
-            rw=rank_width, nw=name_width, sw=score_width, ww=wins_width, pw=part_width
+    dates = db.getSeasonDates(c, season)
+    rows = _sisoRows(players, wins, partecipate)
+    message = 'Classifica {} Siso\n'.format(html.escape(season or 'in corso'))
+    message += 'Date: <code>{}</code>\n\n'.format(_displaySeasonDates(*(dates or (None, None))))
+    rank_width = len(str(len(rows)))
+    name_width = max((len(row[0]) for row in rows), default=0)
+    score_width = max((len(str(row[1])) for row in rows), default=1)
+    for rank, (player, score, player_wins, games) in enumerate(rows, 1):
+        message += '<code>{:>{}}) {:<{}} {:>{}}  [{}/{}]</code>\n'.format(
+            rank, rank_width, html.escape(player), name_width, score, score_width,
+            player_wins, games
         )
-
-    message = message + '\nF counter: <code>{}</code>\n'.format(sum(wins))
-    message = message + "Metodo Calcolo: 5-1"
+    message += '\nF counter: <code>{}</code>\nMetodo Calcolo: 5-1'.format(sum(wins))
     db.closeDbConn(c)
     return message
 
@@ -349,12 +350,8 @@ def _sisoProgressionPlot(conn, players, from_frigo, to_frigo, season_label):
 
 def sisoProgression(db_path):
     conn = db.openDbConn(db_path)
-    current_season = db.getCurrentSeason(conn)
+    stagione, from_frigo = db.getCurrentSeason(conn)
     to_frigo = db.getNumberOfFrigos(conn)
-    if current_season is None:
-        db.closeDbConn(conn)
-        return None
-    stagione, from_frigo = current_season
     players, _, _ = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
     save_path = _sisoProgressionPlot(conn, players, from_frigo, to_frigo, stagione or 'stagione in corso')
     db.closeDbConn(conn)
@@ -362,45 +359,42 @@ def sisoProgression(db_path):
 
 
 def sisoDetails(db_path, selector):
-    '''Restituisce classifica finale/corrente e grafico per numero ordinale o nome siso.'''
+    '''Classifica per siso. Le siso concluse includono la progressione; quella
+    corrente mostra solo la classifica, per evitare un grafico incompleto.'''
     conn = db.openDbConn(db_path)
-    seasons = db.getSeasons(conn)
+    seasons = db.getSeasonsWithDates(conn)
     if not seasons:
         db.closeDbConn(conn)
         return None, 'Non c\'è nessuna siso registrata.'
 
-    if selector.strip().isdigit():
-        ordinal = int(selector.strip())
+    selector = selector.strip()
+    if selector.isdigit():
+        ordinal = int(selector)
         if ordinal < 1 or ordinal > len(seasons):
             db.closeDbConn(conn)
             return None, 'La siso numero {} non esiste.'.format(ordinal)
         season = seasons[ordinal - 1]
     else:
-        query = selector.strip().casefold()
+        query = selector.casefold()
         season = max(
             seasons,
             key=lambda row: difflib.SequenceMatcher(a=query, b=row[0].casefold()).ratio()
         )
-        similarity = difflib.SequenceMatcher(a=query, b=season[0].casefold()).ratio()
-        if similarity < 0.5:
+        if difflib.SequenceMatcher(a=query, b=season[0].casefold()).ratio() < 0.5:
             db.closeDbConn(conn)
             return None, 'Non trovo una siso che si chiami così.'
         ordinal = seasons.index(season) + 1
 
-    name, from_frigo, season_to, winner = season
-    to_frigo = season_to if season_to is not None else db.getNumberOfFrigos(conn)
+    name, from_frigo, season_to, winner, startdate, enddate = season
+    current = season_to is None
+    to_frigo = db.getNumberOfFrigos(conn) if current else season_to
     players, wins, participated = db.getPlayerLeaderboard(
         conn, from_frigo=from_frigo, to_frigo=to_frigo
     )
-    rows = sorted(
-        ((p, wins[i] * 5 - (participated[i] - wins[i]), wins[i], participated[i])
-         for i, p in enumerate(players)),
-        key=lambda row: row[1], reverse=True
-    )
-
-    current = season_to is None
-    message = 'Classifica{} Siso #{} — <b>{}</b> [{} - {}]\n\n'.format(
-        ' attuale' if current else ' finale', ordinal, html.escape(name), from_frigo, to_frigo
+    rows = _sisoRows(players, wins, participated)
+    message = 'Classifica{} Siso #{} — <b>{}</b>\nDate: <code>{}</code>\n\n'.format(
+        ' attuale' if current else ' finale', ordinal, html.escape(name),
+        _displaySeasonDates(startdate, enddate)
     )
     if not rows:
         message += 'Nessuna frigo giocata in questa siso.'
@@ -415,9 +409,13 @@ def sisoDetails(db_path, selector):
                 player_wins, games, trophy
             )
 
-    players_for_plot = [row[0] for row in rows]
+    if current:
+        db.closeDbConn(conn)
+        return (message, None, None), None
+
     plot_path = _sisoProgressionPlot(
-        conn, players_for_plot, from_frigo, to_frigo, '{} (#{})'.format(name, ordinal)
+        conn, [row[0] for row in rows], from_frigo, to_frigo,
+        '{} (#{})'.format(name, ordinal)
     )
     caption = 'Siso #{} ({}) - Progressione'.format(ordinal, html.escape(name))
     db.closeDbConn(conn)
@@ -441,11 +439,13 @@ def closeSeasonPreview(db_path):
         db.closeDbConn(conn)
         return None, 'Non c\'è nessuna stagione aperta da chiudere.'
     to_frigo = db.getNumberOfFrigos(conn)
+    dates = db.getSeasonDates(conn, stagione)
     from_frigo_link = _frigoNumberLink(conn, from_frigo)
     to_frigo_link = _frigoNumberLink(conn, to_frigo)
     db.closeDbConn(conn)
-    message = 'Sicuro di voler chiudere la stagione <code>{}</code> [{} - {}]?'.format(
-        stagione, from_frigo_link, to_frigo_link
+    message = 'Sicuro di voler chiudere la stagione <code>{}</code> [{} - {}]\nDate: <code>{}</code>?'.format(
+        stagione, from_frigo_link, to_frigo_link,
+        _displaySeasonDates(*(dates or (None, None)))
     )
     return stagione, message
 
@@ -469,27 +469,26 @@ def closeSeason(db_path):
 
     wins_before = db.getSeasonWinCount(conn, winner)
     ordinale_siso = db.getSeasonOrdinal(conn, stagione)
+    startdate, enddate = db.getSeasonDates(conn, stagione)
     db.closeSeason(conn, stagione, to_frigo, winner)
 
     from_frigo_link = _frigoNumberLink(conn, from_frigo)
     to_frigo_link = _frigoNumberLink(conn, to_frigo)
 
+    date_range = _displaySeasonDates(startdate, enddate)
     if wins_before == 0:
-        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\n\nSi incorona <b>{}<b>, alla sua prima siso\n'.format(
-            stagione, ordinale_siso, from_frigo_link, to_frigo_link, winner
+        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\nDate: <code>{}</code>\n\nSi incorona <b>{}<b>, alla sua prima siso\n'.format(
+            stagione, ordinale_siso, from_frigo_link, to_frigo_link, date_range, winner
         )
     else:
-        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\n\nSi incorona <b>{}<b>, portandosi a casa la sua {} stagione\n'.format(
-            stagione, ordinale_siso, from_frigo_link, to_frigo_link, winner, joks.ordinale_it(wins_before + 1)
+        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\nDate: <code>{}</code>\n\nSi incorona <b>{}<b>, portandosi a casa la sua {} stagione\n'.format(
+            stagione, ordinale_siso, from_frigo_link, to_frigo_link, date_range, winner, joks.ordinale_it(wins_before + 1)
         )
 
     message = message + _seasonWinNarrative(conn, from_frigo, to_frigo, winner) + '\n'
     message = message + _seasonInsights(conn, players, wins, partecipate, from_frigo, to_frigo)
 
-    plot_path = _sisoProgressionPlot(
-        conn, players, from_frigo, to_frigo,
-        '{} (#{})'.format(stagione, ordinale_siso)
-    )
+    plot_path = _sisoProgressionPlot(conn, players, from_frigo, to_frigo, stagione)
     caption = 'Siso #{} ({}) - Progressione'.format(ordinale_siso, html.escape(stagione))
 
     db.closeDbConn(conn)
@@ -498,9 +497,22 @@ def closeSeason(db_path):
 
 def startNewSeason(db_path, stagione, from_frigo):
     conn = db.openDbConn(db_path)
-    db.newSeason(conn, stagione, from_frigo)
+    seasons = db.getSeasonsWithDates(conn)
+    previous_end = seasons[-1][5] if seasons else None
+    if previous_end:
+        start = datetime.strptime(previous_end, '%d/%m/%y').date() + timedelta(days=1)
+    else:
+        start = date.today()
+    end_month = start.month + 3
+    end_year = start.year + (end_month - 1) // 12
+    end_month = (end_month - 1) % 12 + 1
+    end_day = min(start.day, calendar.monthrange(end_year, end_month)[1])
+    end = date(end_year, end_month, end_day) - timedelta(days=1)
+    startdate = start.strftime('%d/%m/%y')
+    enddate = end.strftime('%d/%m/%y')
+    db.newSeason(conn, stagione, from_frigo, startdate, enddate)
     db.closeDbConn(conn)
-    return
+    return startdate, enddate
 
 
 def _seasonWinNarrative(conn, from_frigo, to_frigo, winner):
@@ -1450,17 +1462,13 @@ def tagger(db_path):
     return message + 'frigo'
 
 
-def frigoFrequency(db_path, n_weeks=None):
+def frigoFrequency(db_path):
     conn = db.openDbConn(db_path)
     w, f = db.getNumberOfFrigoPerWeek(conn)
-    current_week = db.getActualWeek(conn)
-    week_start_dates = db.getWeekStartDates(conn)
-    week_durations = db.getWeekDurations(conn)
     db.closeDbConn(conn)
     save_path = r'frequenza.png'
-    graph.save_hist(w, f, save_path, current_week=current_week,
-                    week_start_dates=week_start_dates, week_durations=week_durations,
-                    n_weeks=n_weeks)
+    graph.save_hist(w, f, save_path)
+    db.closeDbConn(conn)
     return save_path
 
 
@@ -1678,33 +1686,6 @@ def topWincons(db_path, limit=10):
         message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {cnt:>{cw}} ({wr:>3.0f}%)</code>".format(
             rank=i + 1, name=mon, cnt=wincon_cnt, wr=wr,
             rw=rank_width, nw=name_width, cw=cnt_width
-        )
-    return message
-
-
-def sisoHallOfFame(db_path):
-    conn = db.openDbConn(db_path)
-    seasons = db.getSeasons(conn)
-    db.closeDbConn(conn)
-
-    titles = {}
-    for season, _, to_frigo, winner in seasons:
-        if to_frigo is not None and winner:
-            titles.setdefault(winner, []).append(season)
-
-    if not titles:
-        return "Non è ancora stata chiusa nessuna siso."
-
-    ranking = sorted(titles.items(), key=lambda item: (-len(item[1]), item[1][0].casefold()))
-    message = "Albo d'oro siso\n\n"
-    rank_width = len(str(len(ranking)))
-    name_width = max(len(player) for player, _ in ranking)
-    count_width = max(len(str(len(won_seasons))) for _, won_seasons in ranking)
-
-    for rank, (player, won_seasons) in enumerate(ranking, 1):
-        message += '<code>{:>{}}) {:<{}} {:>{}}</code> — {}\n'.format(
-            rank, rank_width, html.escape(player), name_width, len(won_seasons), count_width,
-            ', '.join(html.escape(season) for season in won_seasons)
         )
     return message
 

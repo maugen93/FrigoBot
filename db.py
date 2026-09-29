@@ -1,12 +1,13 @@
 import sqlite3
 import polars
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def openDbConn(dbpath):
     conn = sqlite3.connect(dbpath)
     ensureStatsCacheSchema(conn)
     ensureFrigosSchema(conn)
+    ensureSeasonDatesSchema(conn)
     ensureCommandLogSchema(conn)
     return conn
 
@@ -58,6 +59,40 @@ def ensureStatsCacheSchema(conn):
         wins INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (player, week)
     )''')
+    conn.commit()
+
+
+def ensureSeasonDatesSchema(conn):
+    """Add calendar boundaries for seasons, preserving existing databases."""
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(stagioni)")]
+    if 'startdate' not in cols:
+        conn.execute("ALTER TABLE stagioni ADD COLUMN startdate TEXT")
+    if 'enddate' not in cols:
+        conn.execute("ALTER TABLE stagioni ADD COLUMN enddate TEXT")
+    conn.commit()
+
+    # Backfill known boundaries from the first/last recorded match of each
+    # already-existing season. New seasons store their planned dates directly.
+    conn.execute('''UPDATE stagioni SET startdate=(
+        SELECT data FROM frigos WHERE progr=stagioni.from_frigo
+    ) WHERE startdate IS NULL''')
+    conn.execute('''UPDATE stagioni SET enddate=(
+        SELECT data FROM frigos WHERE progr=stagioni.to_frigo
+    ) WHERE enddate IS NULL AND to_frigo IS NOT NULL''')
+    # Legacy open seasons also need a planned end boundary. Treat a season as
+    # three calendar months, inclusive of its start date.
+    for stagione, startdate in conn.execute(
+            "SELECT stagione, startdate FROM stagioni WHERE to_frigo IS NULL AND enddate IS NULL"):
+        try:
+            start = datetime.strptime(startdate, '%d/%m/%y')
+            month = start.month + 3
+            year = start.year + (month - 1) // 12
+            month = (month - 1) % 12 + 1
+            end = start.replace(year=year, month=month, day=1) - timedelta(days=1)
+            conn.execute("UPDATE stagioni SET enddate=? WHERE stagione=?",
+                         (end.strftime('%d/%m/%y'), stagione))
+        except (TypeError, ValueError):
+            pass
     conn.commit()
 
 
@@ -837,15 +872,29 @@ def getSeasons(conn):
     return cur.fetchall()
 
 
+def getSeasonsWithDates(conn):
+    '''Tutte le stagioni in ordine cronologico, incluse le date.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT stagione, from_frigo, to_frigo, winner, startdate, enddate
+                   FROM stagioni ORDER BY from_frigo''')
+    return cur.fetchall()
+
+
+def getSeasonDates(conn, stagione):
+    cur = conn.cursor()
+    cur.execute("SELECT startdate, enddate FROM stagioni WHERE stagione=?", (stagione,))
+    return cur.fetchone()
+
+
 def closeSeason(conn, stagione, to_frigo, winner):
     conn.execute("UPDATE stagioni SET to_frigo=?, winner=? WHERE stagione=?",
                  (to_frigo, winner, stagione))
     conn.commit()
 
 
-def newSeason(conn, stagione, from_frigo):
-    conn.execute("INSERT INTO stagioni (stagione, from_frigo) VALUES (?, ?)",
-                 (stagione, from_frigo))
+def newSeason(conn, stagione, from_frigo, startdate, enddate):
+    conn.execute("INSERT INTO stagioni (stagione, from_frigo, startdate, enddate) VALUES (?, ?, ?, ?)",
+                 (stagione, from_frigo, startdate, enddate))
     conn.commit()
 
 

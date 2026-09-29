@@ -154,9 +154,10 @@ async def season_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
         await update.message.reply_text(
             message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
         )
-        await update.message.reply_photo(
-            plot_path, caption=caption, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
-        )
+        if plot_path:
+            await update.message.reply_photo(
+                plot_path, caption=caption, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+            )
         return
 
     await update.message.reply_text(
@@ -283,11 +284,11 @@ async def new_season_name_message(update: Update, context: ContextTypes.DEFAULT_
     if not stagione:
         return
 
-    worker.startNewSeason(path, stagione, pending['from_frigo'])
+    startdate, enddate = worker.startNewSeason(path, stagione, pending['from_frigo'])
     del _pending_new_season[chat_id]
     await update.message.reply_text(
-        'Fatto, si parte con la stagione <code>{}</code> da #{}.'.format(
-            html.escape(stagione), pending['from_frigo']
+        'Fatto, si parte con la stagione <code>{}</code> da #{}.\nDate: <code>{} – {}</code>'.format(
+            html.escape(stagione), pending['from_frigo'], startdate, enddate
         ),
         parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
