@@ -1152,9 +1152,12 @@ def spawnRanking(animale, db_path):
         message += '\n{}:\n'.format(title)
         for player, count, games, rate in ordered[:3]:
             value = count if sort_index == 1 else rate
-            rank = 1 + sum(1 for row in results if row[sort_index] > value)
+            better = sum(1 for row in results if row[sort_index] > value)
+            rank_label = _ordinal(better + 1)
+            if sum(1 for row in results if row[sort_index] == value) > 1:
+                rank_label = 't-{}'.format(rank_label)
             message += '<code>{}) {} — {}</code>\n'.format(
-                _ordinal(rank), html.escape(player),
+                rank_label, html.escape(player),
                 '{} spawn'.format(count) if sort_index == 1 else '{:.2f}% ({}/{})'.format(rate, count, games)
             )
     return message.rstrip()
