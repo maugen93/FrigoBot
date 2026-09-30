@@ -1210,14 +1210,14 @@ def coppia(player, pokemon, db_path):
         message += 'Win (su winconate): <code>{}/{}</code>\n'.format(wins_count, wincon_count)
 
     if first_spawn and spawn_count > 1:
-        message += 'Primum spawn: frigo <code>#{}</code> ({})\n'.format(
+        message += '\n\nPrimum spawn: frigo <code>#{}</code> ({})\n'.format(
             first_spawn[0], html.escape(first_spawn[1] or 'data n/d')
         )
         message += 'Ultimo spawn: frigo <code>#{}</code> ({})'.format(
             last_spawn[0], html.escape(last_spawn[1] or 'data n/d')
         )
     elif spawn_count == 1:
-        message += 'Unico spawn: frigo <code>#{}</code> ({})\n'.format(
+        message += '\n\nUnico spawn: frigo <code>#{}</code> ({})\n'.format(
             first_spawn[0], html.escape(first_spawn[1] or 'data n/d')
             )
     else:
