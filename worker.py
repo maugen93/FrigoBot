@@ -230,7 +230,7 @@ def frigoInfo(frigo_nr, db_path):
         else:
             marker = ' '
         pokemon = wincons_by_player.get(p)
-        pokemon_text = ', '.join(pokemon) if pokemon else 'Wincon non registrata'
+        pokemon_text = ', '.join(_truncate_name_with_dot(mon) for mon in pokemon) if pokemon else 'Wincon non registrata'
         player_column = '{}{}'.format(marker, p).ljust(max_width)
         player_rows.append('<code>{} │  {}</code>'.format(
             html.escape(player_column), html.escape(pokemon_text)
@@ -1389,14 +1389,16 @@ def predilette(player, db_path, limit=10):
 
     message = "<b>{}</b> - top {} wincon predilette (per numero di volte):\n".format(top_similar, len(top))
 
+    display_names = [_truncate_name_with_dot(mon) for mon, _, _ in top]
+
     rank_width = len(str(len(top)))
-    name_width = max((len(mon) for mon, _, _ in top), default=0)
+    name_width = max((len(name) for name in display_names), default=0)
     cnt_width = max((len(str(wincon_cnt)) for _, wincon_cnt, _ in top), default=1)
 
-    for i, (mon, wincon_cnt, spawn_cnt) in enumerate(top):
+    for i, ((mon, wincon_cnt, spawn_cnt), name) in enumerate(zip(top, display_names)):
         wr = wincon_cnt / spawn_cnt * 100
         message = message + "\n<code>{rank:>{rw}}) {name:<{nw}} {cnt:>{cw}} ({wr:>3.0f}%)</code>".format(
-            rank=i + 1, name=mon, cnt=wincon_cnt, wr=wr,
+            rank=i + 1, name=name, cnt=wincon_cnt, wr=wr,
             rw=rank_width, nw=name_width, cw=cnt_width
         )
     return message
@@ -1428,7 +1430,7 @@ def affettive(player, db_path, limit=10):
     display_names = [_truncate_name_with_dot(mon) for mon, _, _ in top]
 
     rank_width = len(str(len(top)))
-    name_width = min(max((len(n) for n in display_names), default=0), 12)
+    name_width = max((len(name) for name in display_names), default=0)
     cnt_width = max((len(str(wincon_cnt)) for _, wincon_cnt, _ in top), default=1)
     spawn_width = max((len(str(spawn_cnt)) for _, _, spawn_cnt in top), default=1)
 
