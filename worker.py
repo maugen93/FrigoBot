@@ -1120,7 +1120,48 @@ def edginessRanking(db_path):
     return message
 
 
+def spawnRanking(animale, db_path):
+    '''Top 3 giocatori per numero di spawn e percentuale di spawn di un animale.'''
+    conn = db.openDbConn(db_path)
+    top_pokemon = None
+    top_similarity = 0
+    for candidate in db.getAllMons(conn):
+        similarity = difflib.SequenceMatcher(a=animale.lower(), b=candidate.lower()).ratio()
+        if similarity > 0.7 and similarity > top_similarity:
+            top_pokemon = candidate
+            top_similarity = similarity
+
+    if not top_pokemon:
+        db.closeDbConn(conn)
+        return "non mi risulta che qualcosa chiamato <code>{}</code> abbia mai solcato i palchi".format(
+            html.escape(animale)
+        )
+
+    stats = db.getPokemonSpawnStatsByPlayer(conn, top_pokemon)
+    db.closeDbConn(conn)
+    if not stats:
+        return 'Nessuno ha mai spawnato {}'.format(html.escape(top_pokemon))
+
+    results = [
+        (player, count, games, count * 100 / games if games else 0)
+        for player, count, games in stats
+    ]
+    message = '<b>Top spawn di {}</b>\n'.format(html.escape(top_pokemon))
+    for title, sort_index in (('Numero assoluto', 1), ('Percentuale', 3)):
+        ordered = sorted(results, key=lambda row: row[sort_index], reverse=True)
+        message += '\n{}:\n'.format(title)
+        for player, count, games, rate in ordered[:3]:
+            value = count if sort_index == 1 else rate
+            rank = 1 + sum(1 for row in results if row[sort_index] > value)
+            message += '<code>{}) {} — {}</code>\n'.format(
+                _ordinal(rank), html.escape(player),
+                '{} spawn'.format(count) if sort_index == 1 else '{:.2f}% ({}/{})'.format(rate, count, games)
+            )
+    return message.rstrip()
+
+
 def coppia(player, pokemon, db_path):
+    conn = db.openDbConn(db_path)
     conn = db.openDbConn(db_path)
 
     top_player = None
