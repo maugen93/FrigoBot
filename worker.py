@@ -1120,6 +1120,110 @@ def edginessRanking(db_path):
     return message
 
 
+def spawnRanking(animale, db_path):
+    '''Top 3 giocatori per numero di spawn e percentuale di spawn di un animale.'''
+    conn = db.openDbConn(db_path)
+    top_pokemon = None
+    top_similarity = 0
+    for candidate in db.getAllMons(conn):
+        similarity = difflib.SequenceMatcher(a=animale.lower(), b=candidate.lower()).ratio()
+        if similarity > 0.7 and similarity > top_similarity:
+            top_pokemon = candidate
+            top_similarity = similarity
+
+    if not top_pokemon:
+        db.closeDbConn(conn)
+        return "non mi risulta che qualcosa chiamato <code>{}</code> abbia mai solcato i palchi".format(
+            html.escape(animale)
+        )
+
+    stats = db.getPokemonSpawnStatsByPlayer(conn, top_pokemon)
+    db.closeDbConn(conn)
+    if not stats:
+        return 'Nessuno ha mai spawnato {}'.format(html.escape(top_pokemon))
+
+    results = [
+        (player, count, games, count * 100 / games if games else 0)
+        for player, count, games in stats
+    ]
+    message = '<b>Top spawn di {}</b>\n'.format(html.escape(top_pokemon))
+    for title, sort_index in (('Numero assoluto', 1), ('Percentuale', 3)):
+        ordered = sorted(results, key=lambda row: row[sort_index], reverse=True)
+        message += '\n{}:\n'.format(title)
+        for player, count, games, rate in ordered[:3]:
+            value = count if sort_index == 1 else rate
+            better = sum(1 for row in results if row[sort_index] > value)
+            rank_label = _ordinal(better + 1)
+            if sum(1 for row in results if row[sort_index] == value) > 1:
+                rank_label = 't-{}'.format(rank_label)
+            message += '<code>{}) {} — {}</code>\n'.format(
+                rank_label, html.escape(player),
+                '{} spawn'.format(count) if sort_index == 1 else '{:.2f}% ({}/{})'.format(rate, count, games)
+            )
+    return message.rstrip()
+
+
+def coppia(player, pokemon, db_path):
+    conn = db.openDbConn(db_path)
+    conn = db.openDbConn(db_path)
+
+    top_player = None
+    top_player_similarity = 0
+    for candidate in db.getAllPlayers(conn):
+        similarity = difflib.SequenceMatcher(a=player.lower(), b=candidate.lower()).ratio()
+        if similarity > 0.7 and similarity > top_player_similarity:
+            top_player = candidate
+            top_player_similarity = similarity
+
+    top_pokemon = None
+    top_pokemon_similarity = 0
+    for candidate in db.getAllMons(conn):
+        similarity = difflib.SequenceMatcher(a=pokemon.lower(), b=candidate.lower()).ratio()
+        if similarity > 0.7 and similarity > top_pokemon_similarity:
+            top_pokemon = candidate
+            top_pokemon_similarity = similarity
+
+    if not top_player:
+        db.closeDbConn(conn)
+        return "chi cazz'è <code>{}</code> oh".format(html.escape(player))
+    if not top_pokemon:
+        db.closeDbConn(conn)
+        return "che animale è <code>{}</code> oh".format(html.escape(pokemon))
+
+    spawn_count, wins_count, wincon_count, games_played, first_spawn, last_spawn, replay = \
+        db.getPlayerPokemonStats(conn, top_player, top_pokemon)
+    spawn_stats = db.getPokemonSpawnStatsByPlayer(conn, top_pokemon)
+    spawn_counts = [row[1] for row in spawn_stats]
+    spawn_rates = [row[1] * 100 / row[2] if row[2] else 0 for row in spawn_stats]
+    db.closeDbConn(conn)
+
+    player_name = html.escape(top_player)
+    pokemon_name = html.escape(top_pokemon)
+    message = '<b>{} + {}</b>\n\n'.format(player_name, pokemon_name)
+    spawn_rate = spawn_count * 100 / games_played if games_played else 0
+    if spawn_rate > 0:
+        spawn_count_rank = _formatRank(spawn_count, spawn_counts)
+        spawn_rate_rank = _formatRank(spawn_rate, spawn_rates)
+        message += 'Spawn totali: <code>{}</code>{} (<code>{:.2f}%</code>{})\n'.format(
+            spawn_count, spawn_count_rank, spawn_rate, spawn_rate_rank
+        )
+        message += 'Win (su winconate): <code>{}/{}</code>\n'.format(wins_count, wincon_count)
+
+    if first_spawn:
+        message += 'Primum spawn: frigo <code>#{}</code> ({})\n'.format(
+            first_spawn[0], html.escape(first_spawn[1] or 'data n/d')
+        )
+        message += 'Ultimo spawn: frigo <code>#{}</code> ({})'.format(
+            last_spawn[0], html.escape(last_spawn[1] or 'data n/d')
+        )
+    else:
+        message += f'Mai spawnato con {player_name}'
+
+    if replay:
+        message += '\n\n→ Sverginato: <a href="{}">replay</a>'.format(html.escape(replay, quote=True))
+    return message
+
+
 def wins_animale(animale, path):
     conn = db.openDbConn(path)
     mons = db.getAllMons(conn)

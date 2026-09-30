@@ -628,6 +628,57 @@ def getAllPlayers(conn):
     return p
 
 
+def getPokemonSpawnStatsByPlayer(conn, pokemon):
+    '''Per ogni giocatore che ha spawnato `pokemon`, ritorna (player, spawn, partite).
+    Le partite sono il denominatore per la percentuale di spawn in classifica.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT s.player, COUNT(*) AS spawn_count,
+                          (SELECT COUNT(*) FROM frigos f
+                           WHERE f.player1=s.player OR f.player2=s.player
+                              OR f.player3=s.player OR f.player4=s.player) AS games_played
+                   FROM spawns s
+                   WHERE s.spawn=?
+                   GROUP BY s.player''', (pokemon,))
+    return cur.fetchall()
+
+
+def getPlayerPokemonStats(conn, player, pokemon):
+    '''Statistiche di una coppia player/pokemon: spawn, vittorie, wincon,
+    primo/ultimo spawn e link della sverginata se il player ha fatto la prima
+    vittoria storica di quel pokemon. I frigo sono rappresentati come
+    (progr, data).'''
+    cur = conn.cursor()
+    cur.execute('''SELECT COUNT(*),
+                          SUM(CASE WHEN winconato=1 THEN 1 ELSE 0 END),
+                          MIN(frigo), MAX(frigo)
+                   FROM spawns WHERE player=? AND spawn=?''', (player, pokemon))
+    spawn_count, wincon_count, first_frigo, last_frigo = cur.fetchone()
+
+    cur.execute('''SELECT COUNT(*) FROM frigos
+                   WHERE player1=? OR player2=? OR player3=? OR player4=?''',
+                (player, player, player, player))
+    games_played = cur.fetchone()[0]
+
+    cur.execute('''SELECT COUNT(*) FROM frigos
+                   WHERE winner=? AND pokewinner=?''', (player, pokemon))
+    wins_count = cur.fetchone()[0]
+
+    first_spawn = last_spawn = None
+    if first_frigo is not None:
+        cur.execute("SELECT progr, data FROM frigos WHERE progr=?", (first_frigo,))
+        first_spawn = cur.fetchone()
+        cur.execute("SELECT progr, data FROM frigos WHERE progr=?", (last_frigo,))
+        last_spawn = cur.fetchone()
+
+    cur.execute('''SELECT winner, replay_link FROM frigos
+                   WHERE pokewinner=? ORDER BY progr LIMIT 1''', (pokemon,))
+    first_win = cur.fetchone()
+    sverginata_replay = (
+        first_win[1] if first_win and first_win[0] == player else None
+    )
+    return spawn_count, wins_count, wincon_count or 0, games_played, first_spawn, last_spawn, sverginata_replay
+
+
 def getNumFrigoWithPlayersSpecified(conn):
     cur = conn.cursor()
     cur.execute("select count(*) ar from frigos where player1 is not null")

@@ -390,6 +390,38 @@ async def animale_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
         return
 
 
+async def spawn_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    animale = update.message.text.partition(' ')[2].strip()
+    if not animale:
+        await update.message.reply_text(
+            'e dammi un animale', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    message = worker.spawnRanking(animale, path)
+    await update.message.reply_text(
+        message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
+async def coppia_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    arguments = update.message.text.partition(' ')[2].strip()
+    player, separator, pokemon = arguments.partition(',')
+    if not separator or not player.strip() or not pokemon.strip():
+        await update.message.reply_text(
+            'così si usa deh: <code>/coppia giocatore, pokemon</code>', parse_mode='HTML',
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    message = worker.coppia(player.strip(), pokemon.strip(), path)
+    await update.message.reply_text(
+        message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 async def player_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     command = update.message.text
     cmds = command.split(' ')
@@ -547,6 +579,8 @@ COMMAND_SECTIONS = [
         ("animali", "classifica animali per vittorie"),
         ("animali2", "classifica animali per winrate"),
         ("animale &lt;nome&gt;", "statistiche su un animale"),
+        ("coppia &lt;giocatore&gt;,&lt;pokemon&gt;", "statistiche di un giocatore con un animale"),
+        ("spawn &lt;animale&gt;", "top giocatori per spawn assoluti e percentuali di un animale"),
         ("wincons", "animali più winconati"),
         ("cessi", "animali da sverginare"),
         ("desaparecidos", "animali che non spawnano da più tempo"),
@@ -714,6 +748,8 @@ def start_bot(token, db_path):
     c_sisos = CommandHandler("sisos", partial(sisos_command, path=db_path))
     c_score = CommandHandler("score", partial(score_command, path=db_path))
     c_animale = CommandHandler("animale", partial(animale_command, path=db_path))
+    c_coppia = CommandHandler("coppia", partial(coppia_command, path=db_path))
+    c_spawn = CommandHandler("spawn", partial(spawn_command, path=db_path))
     c_global = CommandHandler("global", partial(global_rank_command, path=db_path))
 
     c_query = CommandHandler("query", partial(query_command, path=db_path))
@@ -779,6 +815,8 @@ def start_bot(token, db_path):
     application.add_handler(c_query)
     application.add_handler(c_tag)
     application.add_handler(c_animale)
+    application.add_handler(c_coppia)
+    application.add_handler(c_spawn)
     application.add_handler(c_global)
     application.add_handler(c_frigo)
     application.add_handler(c_pl)
