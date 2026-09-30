@@ -21,11 +21,17 @@ Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment
     s = re.sub(r'\((.*%)\)$', '', s)
     s = re.sub(r'\((.*%\|[a-z]{1,3})\)$', '', s)
     s = re.sub(r'\(fainted\)$', '', s)
+    s = s.strip()
+    # Showdown identifies the teal-mask forme as either Ogerpon-Teal or
+    # Ogerpon (Ogerpon-Teal)/(Teal Mask). Normalize before the generic
+    # parenthesis cleanup below, which would otherwise discard the species.
+    if re.fullmatch(
+            r'ogerpon(?:[- ]teal(?:[- ]mask)?|\s*\((?:ogerpon[- ]?)?teal(?:[- ]mask)?\))',
+            s, flags=re.IGNORECASE):
+        return 'Ogerpon'
     match = re.search(r'\(([^)]+)\)', s)
     s = match.group(1) if match else s
     s = s.strip()
-    if s.casefold() == 'ogerpon-teal':
-        return 'Ogerpon'
     if s not in NON_COSMETIC_FORMS:
         s = re.sub(rf'\-({ALT_FORMS})$', '', s)
     for ot_n in other_animals:
