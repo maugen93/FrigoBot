@@ -1489,13 +1489,19 @@ def tagger(db_path):
     return message + 'frigo'
 
 
-def frigoFrequency(db_path):
+def frigoFrequency(db_path, n_weeks=None):
     conn = db.openDbConn(db_path)
     w, f = db.getNumberOfFrigoPerWeek(conn)
+    current_week = db.getActualWeek(conn)
+    week_start_dates = db.getWeekStartDates(conn)
+    week_durations = db.getWeekDurations(conn)
     db.closeDbConn(conn)
     save_path = r'frequenza.png'
-    graph.save_hist(w, f, save_path)
-    db.closeDbConn(conn)
+    graph.save_hist(
+        w, f, save_path, current_week=current_week,
+        week_start_dates=week_start_dates, week_durations=week_durations,
+        n_weeks=n_weeks,
+    )
     return save_path
 
 
