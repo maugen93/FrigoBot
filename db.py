@@ -629,13 +629,15 @@ def getAllPlayers(conn):
 
 
 def getPokemonSpawnStatsByPlayer(conn, pokemon):
-    '''Per ogni giocatore che ha spawnato `pokemon`, ritorna (player, spawn, partite).
-    Le partite sono il denominatore per la percentuale di spawn in classifica.'''
+    '''Per ogni giocatore che ha spawnato `pokemon`, ritorna
+    (player, spawn, frigo_giocatore, frigo_con_spawn, frigo_totali).'''
     cur = conn.cursor()
     cur.execute('''SELECT s.player, COUNT(*) AS spawn_count,
                           (SELECT COUNT(*) FROM frigos f
                            WHERE f.player1=s.player OR f.player2=s.player
-                              OR f.player3=s.player OR f.player4=s.player) AS games_played
+                              OR f.player3=s.player OR f.player4=s.player) AS player_games,
+                          COUNT(DISTINCT s.frigo) AS games_with_spawn,
+                          (SELECT COUNT(*) FROM frigos) AS total_games
                    FROM spawns s
                    WHERE s.spawn=?
                    GROUP BY s.player''', (pokemon,))

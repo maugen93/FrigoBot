@@ -459,10 +459,11 @@ def closeSeasonPreview(db_path):
     '''Anteprima di /closesiso: (stagione, messaggio di conferma), o (None, messaggio) se non c'è
     nessuna stagione aperta da chiudere.'''
     conn = db.openDbConn(db_path)
-    stagione, from_frigo = db.getCurrentSeason(conn)
-    if stagione is None:
+    current_season = db.getCurrentSeason(conn)
+    if current_season is None:
         db.closeDbConn(conn)
         return None, 'Non c\'è nessuna stagione aperta da chiudere.'
+    stagione, from_frigo = current_season
     to_frigo = db.getNumberOfFrigos(conn)
     dates = db.getSeasonDates(conn, stagione)
     from_frigo_link = _frigoNumberLink(conn, from_frigo)
@@ -477,10 +478,11 @@ def closeSeasonPreview(db_path):
 
 def closeSeason(db_path):
     conn = db.openDbConn(db_path)
-    stagione, from_frigo = db.getCurrentSeason(conn)
-    if stagione is None:
+    current_season = db.getCurrentSeason(conn)
+    if current_season is None:
         db.closeDbConn(conn)
         return None, None, None, None
+    stagione, from_frigo = current_season
     to_frigo = db.getNumberOfFrigos(conn)
 
     players, wins, partecipate = db.getPlayerLeaderboard(conn, from_frigo=from_frigo, to_frigo=to_frigo)
@@ -1142,15 +1144,18 @@ def spawnRanking(animale, db_path):
     if not stats:
         return 'Nessuno ha mai spawnato {}'.format(html.escape(top_pokemon))
 
+    total_games = stats[0][4]
     results = [
-        (player, count, games, count * 100 / games if games else 0)
-        for player, count, games in stats
+        (player, count, games_with_spawn, player_games,
+         games_with_spawn * 100 / total_games if total_games else 0)
+        for player, count, player_games, games_with_spawn, total_games in stats
     ]
     message = '<b>Top spawn di {}</b>\n'.format(html.escape(top_pokemon))
-    for title, sort_index in (('Numero assoluto', 1), ('Percentuale', 3)):
+    total_spawns = sum(count for _, count, _, _, _ in stats)
+    for title, sort_index in (('Numero assoluto ({})'.format(total_spawns), 1), ('Percentuale', 4)):
         ordered = sorted(results, key=lambda row: row[sort_index], reverse=True)
         message += '\n{}:\n'.format(title)
-        for player, count, games, rate in ordered[:3]:
+        for player, count, games_with_spawn, player_games, rate in ordered[:3]:
             value = count if sort_index == 1 else rate
             better = sum(1 for row in results if row[sort_index] > value)
             rank_label = _ordinal(better + 1)
@@ -1158,7 +1163,9 @@ def spawnRanking(animale, db_path):
                 rank_label = 't-{}'.format(rank_label)
             message += '<code>{}) {} — {}</code>\n'.format(
                 rank_label, html.escape(player),
-                '{} spawn'.format(count) if sort_index == 1 else '{:.2f}% ({}/{})'.format(rate, count, games)
+                '{} spawn'.format(count)
+                if sort_index == 1
+                else '{:.2f}% ({}/{})'.format(rate, games_with_spawn, total_games)
             )
     return message.rstrip()
 
