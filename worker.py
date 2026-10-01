@@ -504,11 +504,11 @@ def closeSeason(db_path):
 
     date_range = _displaySeasonDates(startdate, enddate)
     if wins_before == 0:
-        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\nDate: <code>{}</code>\n\nSi incorona <b>{}<b>, alla sua prima siso\n'.format(
+        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\nDate: <code>{}</code>\n\nSi incorona <b>{}</b>, alla sua prima siso\n'.format(
             stagione, ordinale_siso, from_frigo_link, to_frigo_link, date_range, winner
         )
     else:
-        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\nDate: <code>{}</code>\n\nSi incorona <b>{}<b>, portandosi a casa la sua {} stagione\n'.format(
+        message = '🏆 Terminata la stagione <code>{}</code> (<code>{}°</code>)[{} - {}]\nDate: <code>{}</code>\n\nSi incorona <b>{}</b>, portandosi a casa la sua {} stagione\n'.format(
             stagione, ordinale_siso, from_frigo_link, to_frigo_link, date_range, winner, joks.ordinale_it(wins_before + 1)
         )
 
