@@ -522,6 +522,44 @@ def closeSeason(db_path):
     return message, plot_path, caption, to_frigo + 1
 
 
+def reopenLastSeasonPreview(db_path):
+    '''Anteprima per riaprire l'ultima siso chiusa se non ci sono frigo
+    successive che renderebbero ambigua la modifica.'''
+    conn = db.openDbConn(db_path)
+    seasons = db.getSeasonsWithDates(conn)
+    closed = [season for season in seasons if season[2] is not None]
+    if not closed:
+        db.closeDbConn(conn)
+        return None, 'Non c\'è nessuna siso chiusa da riaprire.'
+
+    stagione, from_frigo, to_frigo, winner, startdate, enddate = closed[-1]
+    current = db.getCurrentSeason(conn)
+    max_frigo = db.getNumberOfFrigos(conn)
+    db.closeDbConn(conn)
+
+    if current and (current[1] != to_frigo + 1 or max_frigo != to_frigo):
+        return None, 'Non posso riaprire: dopo questa siso ci sono già frigo giocate.'
+    if not current and max_frigo != to_frigo:
+        return None, 'Non posso riaprire: dopo questa siso ci sono già frigo giocate.'
+
+    message = (
+        'Riaprire la siso <code>{}</code> (frigo #{}–{})?\n'
+        'La siso corrente vuota, se presente, verrà rimossa. '
+        'Dopo la riapertura potrai rilanciare /closesiso per rigenerare il report.'
+    ).format(html.escape(stagione), from_frigo, to_frigo)
+    return stagione, message
+
+
+def reopenLastSeason(db_path, expected_season=None):
+    '''Riapre l'ultima siso chiusa in sicurezza, così /closesiso può rigenerare
+    il report completo. Ritorna il nome della siso oppure None se ci sono frigo
+    successive o la situazione non corrisponde a una chiusura appena fatta.'''
+    conn = db.openDbConn(db_path)
+    stagione = db.reopenLastSeason(conn, expected_season)
+    db.closeDbConn(conn)
+    return stagione
+
+
 def startNewSeason(db_path, stagione, from_frigo):
     conn = db.openDbConn(db_path)
     seasons = db.getSeasonsWithDates(conn)

@@ -295,6 +295,52 @@ async def new_season_name_message(update: Update, context: ContextTypes.DEFAULT_
     return
 
 
+async def reopenseason_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    user = update.message.from_user
+    if user.id not in SUPER_USERS:
+        await update.message.reply_text(
+            'Ti piacerebbe, porco', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    stagione, message = worker.reopenLastSeasonPreview(path)
+    if stagione is None:
+        await update.message.reply_text(message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove())
+        return
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Sì, riapri", callback_data="rsz_confirm:{}".format(stagione)),
+        InlineKeyboardButton("❌ No, lascia stare", callback_data="rsz_cancel"),
+    ]])
+    await update.message.reply_text(message, parse_mode='HTML', reply_markup=keyboard)
+
+
+async def reopenseason_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    query = update.callback_query
+    if query.from_user.id not in SUPER_USERS:
+        await query.answer('Ti piacerebbe, porco', show_alert=True)
+        return
+    if query.data == 'rsz_cancel':
+        await query.answer()
+        await query.edit_message_text('Operazione annullata.', parse_mode='HTML')
+        return
+
+    expected_season = query.data.split(':', 1)[1]
+    stagione = worker.reopenLastSeason(path, expected_season)
+    await query.answer()
+    if stagione is None:
+        await query.edit_message_text(
+            'Nel frattempo è cambiato qualcosa, annullo per sicurezza.', parse_mode='HTML'
+        )
+        return
+    await query.edit_message_text(
+        'Siso <code>{}</code> riaperta. Ora puoi rilanciare /closesiso per generare il report.'.format(
+            html.escape(stagione)
+        ), parse_mode='HTML'
+    )
+    return
+
+
 async def clf_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     user = update.message.from_user
     if user.id not in SUPER_USERS:
@@ -770,6 +816,8 @@ def start_bot(token, db_path):
     c_cw = CommandHandler("closeweek", partial(closeweek_command, path=db_path))
     c_cs = CommandHandler("closesiso", partial(closeseason_command, path=db_path))
     cb_cs = CallbackQueryHandler(partial(closeseason_callback, path=db_path), pattern="^csz_")
+    c_rs = CommandHandler("reopensiso", partial(reopenseason_command, path=db_path))
+    cb_rs = CallbackQueryHandler(partial(reopenseason_callback, path=db_path), pattern="^rsz_")
 
     c_clf = CommandHandler("clf", partial(clf_command, path=db_path))
     cb_clf = CallbackQueryHandler(partial(clf_callback, path=db_path), pattern="^clf_")
@@ -829,6 +877,8 @@ def start_bot(token, db_path):
     application.add_handler(c_cw)
     application.add_handler(c_cs)
     application.add_handler(cb_cs)
+    application.add_handler(c_rs)
+    application.add_handler(cb_rs)
     application.add_handler(c_clf)
     application.add_handler(cb_clf)
     application.add_handler(c_calc)

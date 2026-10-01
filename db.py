@@ -953,6 +953,40 @@ def closeSeason(conn, stagione, to_frigo, winner):
     conn.commit()
 
 
+def reopenLastSeason(conn, expected_season=None):
+    '''Riapre l'ultima stagione chiusa, solo se non sono state giocate frigo
+    dopo la sua chiusura. Rimuove anche l'eventuale stagione successiva vuota
+    creata dal flusso di chiusura. Ritorna il nome della stagione riaperta o
+    None se le condizioni di sicurezza non sono rispettate.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT stagione, from_frigo, to_frigo
+                   FROM stagioni WHERE to_frigo IS NOT NULL
+                   ORDER BY from_frigo DESC LIMIT 1''')
+    latest = cur.fetchone()
+    if not latest:
+        return None
+
+    stagione, from_frigo, to_frigo = latest
+    if expected_season is not None and stagione != expected_season:
+        return None
+    cur.execute("SELECT stagione, from_frigo FROM stagioni WHERE to_frigo IS NULL")
+    current = cur.fetchone()
+    cur.execute("SELECT MAX(progr) FROM frigos")
+    max_frigo = cur.fetchone()[0] or 0
+
+    if current:
+        current_name, current_from = current
+        if current_from != to_frigo + 1 or max_frigo != to_frigo:
+            return None
+        cur.execute("DELETE FROM stagioni WHERE stagione=? AND to_frigo IS NULL", (current_name,))
+    elif max_frigo != to_frigo:
+        return None
+
+    cur.execute("UPDATE stagioni SET to_frigo=NULL, winner=NULL WHERE stagione=?", (stagione,))
+    conn.commit()
+    return stagione
+
+
 def newSeason(conn, stagione, from_frigo, startdate, enddate):
     conn.execute("INSERT INTO stagioni (stagione, from_frigo, startdate, enddate) VALUES (?, ?, ?, ?)",
                  (stagione, from_frigo, startdate, enddate))
