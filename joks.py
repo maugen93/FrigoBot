@@ -11,15 +11,23 @@ def ordinale_it(n):
     return ORDINALI_IT.get(n, '{}-esima'.format(n))
 
 
-def messForWinnerOnReg(winner_name, pk_winner, seed=None):
+def messForWinnerOnReg(winner_name, pk_winner, seed=None, cesso_sverginato=False):
     rng = random.Random(seed)
     winner_name = f'<b>{winner_name}</b>'
+    if cesso_sverginato:
+        return rng.choice([
+            'Finalmente sto cesso di {} è stato sverginato, ben fatto {}'.format(pk_winner, winner_name),
+            'Prima vittoria per {}: bravo {} che l\'ha sverginato'.format(pk_winner, winner_name),
+            'E solo {} poteva sverginare {}'.format(winner_name, pk_winner),
+            'Frigo storica per {} che svergina {}, -1 cesso'.format(winner_name, pk_winner),
+        ])
+
     specific_users = {
         'mule': 'Ancora una volta obnubilati dalle lagne di quel maledetto porco. LO ODIO ({})'.format(pk_winner),
         'marviglio': 'Concessa al solito ({})'.format(pk_winner),
         'bot': 'Parterre talmente scarso che vince il bot con {}'.format(pk_winner),
         'ilfato': 'Ma è possibile essere così impediti da far vincere ciccio giunta con {}'.format(pk_winner),
-        'fraga':'Zitto zitto arriva raga con {}'.format(pk_winner),
+        'raga':'Zitto zitto arriva raga con {}'.format(pk_winner),
         'spite':'Vabbe solo spites poteva vincere con {}'.format(pk_winner)
     }
     defaults = ['Vince {} con {}, giocando completamente a caso'.format(winner_name, pk_winner),

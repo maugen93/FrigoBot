@@ -1208,6 +1208,13 @@ def getLastFrigoWonByMon(conn, pokemon):
     return result[0] if result else None
 
 
+def hasPokemonEverWon(conn, pokemon):
+    """True se questo pokemon ha gia' vinto una frigo prima di quella corrente."""
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM frigos WHERE pokewinner=? LIMIT 1", (pokemon,))
+    return cur.fetchone() is not None
+
+
 def getFirstWinnerOfMon(conn, pokemon):
     '''Chi ha sverginato questo animale (il player che ha vinto la prima frigo
     in cui compare come pokewinner, secondo mon_first_win) e il numero di

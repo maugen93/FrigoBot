@@ -105,6 +105,7 @@ def insertResult(db_path, sd_link):
             spawns_for_cache.append((player, an, winconato))
 
     winner_name = db.getPlayerFromSDName(c, winner)
+    cesso_sverginato = not db.hasPokemonEverWon(c, poke_winner)
     data = datetime.now().strftime('%d/%m/%y')
 
     # insert
@@ -117,7 +118,9 @@ def insertResult(db_path, sd_link):
     for pid in list(players.keys()):
         # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
         message = message + '\n{}'.format(players[pid]['id'])
-    message = message + '\n\n' + joks.messForWinnerOnReg(winner_name, poke_winner, seed=progr)
+    message = message + '\n\n' + joks.messForWinnerOnReg(
+        winner_name, poke_winner, seed=progr, cesso_sverginato=cesso_sverginato
+    )
 
     if duration_seconds is not None:
         duration_alert = _durationOutlierMessage(duration_seconds, num_turns, past_durations)
@@ -141,14 +144,18 @@ def _sisoLeader(conn, from_frigo, to_frigo):
 
 def _newSisoLeaderMessage(conn, progr):
     '''Se questa frigo ha appena cambiato chi guida la classifica siso
-    corrente, lo segnala. None se non c'e' una stagione aperta, se e' la
-    prima frigo della stagione (nessun "prima" con cui confrontare), o se il
-    leader non e' cambiato.'''
+    corrente, lo segnala. None se non c'e' una stagione aperta, se siamo nella
+    prima settimana della stagione, o se il leader non e' cambiato.'''
     season = db.getCurrentSeason(conn)
     if not season:
         return None
     _, from_frigo = season
     if progr - 1 < from_frigo:
+        return None
+
+    first_frigo = db.getFrigoInfoFromNumber(conn, from_frigo)
+    current_frigo = db.getFrigoInfoFromNumber(conn, progr)
+    if first_frigo and current_frigo and first_frigo['week'] == current_frigo['week']:
         return None
 
     leader_before = _sisoLeader(conn, from_frigo, progr - 1)
