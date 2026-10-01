@@ -117,7 +117,7 @@ def insertResult(db_path, sd_link):
     message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)
     for pid in list(players.keys()):
         # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
-        message = message + '\n{}'.format(players[pid]['id'])
+        message = message + '\n· {}'.format(players[pid]['id'])
     message = message + '\n\n' + joks.messForWinnerOnReg(
         winner_name, poke_winner, seed=progr, cesso_sverginato=cesso_sverginato
     )
