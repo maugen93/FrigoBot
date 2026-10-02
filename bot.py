@@ -647,6 +647,7 @@ COMMAND_SECTIONS = [
     ]),
     ("👤 Giocatori", [
         ("player &lt;nome&gt;", "scheda giocatore"),
+        ("forma [giocatore] [N]", "forma recente sulle ultime N frigo (default 20, da 10 a 50)"),
         ("predilette &lt;nome&gt;", "wincon preferite (per numero)"),
         ("affettive &lt;nome&gt;", "wincon preferite (per percentuale)"),
         ("pokewinners &lt;nome&gt;", "animali con cui un giocatore trionfa di più"),
@@ -757,6 +758,37 @@ async def svergitryers_command(update: Update, context: ContextTypes.DEFAULT_TYP
     return
 
 
+async def forma_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    window = 20
+    has_window = False
+    selector_parts = []
+    for arg in context.args:
+        if arg.isdigit():
+            if has_window:
+                await update.message.reply_text(
+                    'passami un solo numero: <code>/forma [giocatore] [N]</code>',
+                    parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+                )
+                return
+            window = int(arg)
+            has_window = True
+        else:
+            selector_parts.append(arg)
+
+    if window < 10 or window > 50:
+        await update.message.reply_text(
+            'N deve essere tra 10 e 50: <code>/forma [giocatore] [N]</code>',
+            parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    selector = ' '.join(selector_parts) or None
+    await update.message.reply_text(
+        worker.form(path, selector, window), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+    )
+    return
+
+
 async def edgy_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
         worker.edginessRanking(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
@@ -854,7 +886,7 @@ def start_bot(token, db_path):
     c_svergiconverters = CommandHandler("svergiconverters", partial(svergiconverters_command, path=db_path))
     c_svergitryers = CommandHandler("svergitryers", partial(svergitryers_command, path=db_path))
     c_edgy = CommandHandler("edgy", partial(edgy_command, path=db_path))
-
+    c_forma = CommandHandler("forma", partial(forma_command, path=db_path))
     c_winstreaks = CommandHandler("winstreaks", partial(winstreaks_command, path=db_path))
     c_losestreaks = CommandHandler("losestreaks", partial(losestreaks_command, path=db_path))
 
@@ -905,6 +937,7 @@ def start_bot(token, db_path):
     application.add_handler(c_svergiconverters)
     application.add_handler(c_svergitryers)
     application.add_handler(c_edgy)
+    application.add_handler(c_forma)
     application.add_handler(c_winstreaks)
     application.add_handler(c_losestreaks)
     # Run the bot until the user presses Ctrl-C

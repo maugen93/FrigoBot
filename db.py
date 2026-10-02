@@ -628,6 +628,25 @@ def getAllPlayers(conn):
     return p
 
 
+def getPlayerFormResults(conn):
+    '''Restituisce per ogni partecipante la sequenza cronologica dei risultati
+    (progr, vittoria), dove vittoria e' True se ha vinto quella frigo.'''
+    cur = conn.cursor()
+    cur.execute('''SELECT player, winner, progr FROM (
+                       SELECT player1 AS player, winner, progr FROM frigos WHERE player1 IS NOT NULL
+                       UNION ALL
+                       SELECT player2 AS player, winner, progr FROM frigos WHERE player2 IS NOT NULL
+                       UNION ALL
+                       SELECT player3 AS player, winner, progr FROM frigos WHERE player3 IS NOT NULL
+                       UNION ALL
+                       SELECT player4 AS player, winner, progr FROM frigos WHERE player4 IS NOT NULL
+                   ) ORDER BY progr''')
+    results = {}
+    for player, winner, progr in cur.fetchall():
+        results.setdefault(player, []).append((progr, player == winner))
+    return results
+
+
 def getPokemonSpawnStatsByPlayer(conn, pokemon):
     '''Per ogni giocatore che ha spawnato `pokemon`, ritorna
     (player, spawn, frigo_giocatore, frigo_con_spawn).'''
