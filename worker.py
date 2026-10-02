@@ -1903,7 +1903,7 @@ def form(db_path, selector=None, window=20):
         if not rows:
             return '{} ha meno di 3 frigo giocate: campione insufficiente, porello.'.format(html.escape(selected_player))
     else:
-        rows.sort(key=lambda row: (-row[4], -len(row[1]), row[0].lower()))
+        rows.sort(key=lambda row: (-row[5], -len(row[1]), row[0].lower()))
 
     if not rows:
         return 'Non ci sono abbastanza frigo per calcolare la forma.'
@@ -1912,9 +1912,9 @@ def form(db_path, selector=None, window=20):
     if selected_player:
         message += '<b>{}</b>\n'.format(html.escape(selected_player))
     for rank, (player, recent, wins, losses, score, delta) in enumerate(rows, 1):
-        message += '\n<code>{:>2}) {:<10} {:.1f}% [{}/{}]\n({})</code>{}'.format(
-            rank, html.escape(player), score * 100, wins, wins+losses,
-            'storico insufficiente' if delta is None else '{:+.1f} pp'.format(delta * 100),
+        message += '\n<code>{:>2}) {:<10} {:.1f}% ({})</code>{}'.format(
+            rank, html.escape(player), score * 100,
+            'storico insufficiente' if delta is None else '{:+.1f}'.format(delta * 100),
             ' 📉' if delta is not None and delta < 0 else (' 📈' if delta is not None and delta > 0 else '')
         )
     return message
