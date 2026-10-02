@@ -1851,7 +1851,7 @@ def WinrateAnimali(db_path):
     return message
 
 
-def form(db_path, selector=None, window=20):
+def form(db_path, selector=None, window=30):
     conn = db.openDbConn(db_path)
     results = db.getPlayerFormResults(conn)
     latest_frigo_numbers = db.getLatestFrigoNumbers(conn)
@@ -1882,8 +1882,6 @@ def form(db_path, selector=None, window=20):
         recent = history[-window:]
         if len(recent) < 3:
             continue
-        wins = sum(1 for _, won in recent if won)
-        losses = len(recent) - wins
         total_weight = sum((i + 1) ** 2 for i in range(len(recent)))
         weighted_wins = sum((i + 1) ** 2 for i, (_, won) in enumerate(recent) if won)
         score = weighted_wins / total_weight
@@ -1892,9 +1890,7 @@ def form(db_path, selector=None, window=20):
         if previous:
             historical_winrate = sum(1 for _, won in previous if won) / len(previous)
             delta = score - historical_winrate
-        else:
-            delta = None
-        rows.append((player, recent, wins, losses, score, delta))
+            rows.append((player, recent, score, delta))
 
     db.closeDbConn(conn)
 
@@ -1903,7 +1899,7 @@ def form(db_path, selector=None, window=20):
         if not rows:
             return '{} ha meno di 3 frigo giocate: campione insufficiente, porello.'.format(html.escape(selected_player))
     else:
-        rows.sort(key=lambda row: (-row[5], -len(row[1]), row[0].lower()))
+        rows.sort(key=lambda row: (-row[3], -len(row[1]), row[0].lower()))
 
     if not rows:
         return 'Non ci sono abbastanza frigo per calcolare la forma.'
@@ -1911,8 +1907,8 @@ def form(db_path, selector=None, window=20):
     message = '🔥 Forma ultime <code>{}</code> frigo giocate\n'.format(window)
     if selected_player:
         message += '<b>{}</b>\n'.format(html.escape(selected_player))
-    for rank, (player, recent, wins, losses, score, delta) in enumerate(rows, 1):
-        message += '\n<code>{:>2}) {:<10} {:.1f}% ({})</code>{}'.format(
+    for rank, (player, recent, score, delta) in enumerate(rows, 1):
+        message += '\n<code>{:>2}) {:<11} {:.1f}% ({})</code>{}'.format(
             rank, html.escape(player), score * 100,
             'storico insufficiente' if delta is None else '{:+.1f}'.format(delta * 100),
             ' 📉' if delta is not None and delta < 0 else (' 📈' if delta is not None and delta > 0 else '')
