@@ -1912,7 +1912,7 @@ def form(db_path, selector=None, window=20):
     if selected_player:
         message += '<b>{}</b>\n'.format(html.escape(selected_player))
     for rank, (player, recent, wins, losses, score, delta) in enumerate(rows, 1):
-        message += '\n<code>{:>2}) {:<10} {:.1f}% [{}/{}] ({})</code>{}'.format(
+        message += '\n<code>{:>2}) {:<10} {:.1f}% [{}/{}]\n({})</code>{}'.format(
             rank, html.escape(player), score * 100, wins, wins+losses,
             'storico insufficiente' if delta is None else '{:+.1f} pp'.format(delta * 100),
             ' 📉' if delta is not None and delta < 0 else (' 📈' if delta is not None and delta > 0 else '')
