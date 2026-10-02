@@ -1854,6 +1854,11 @@ def WinrateAnimali(db_path):
 def form(db_path, selector=None, window=20):
     conn = db.openDbConn(db_path)
     results = db.getPlayerFormResults(conn)
+    latest_frigo_numbers = db.getLatestFrigoNumbers(conn)
+    eligible_players = {
+        player for player, history in results.items()
+        if any(progr in latest_frigo_numbers for progr, _ in history)
+    }
     known_players = db.getAllPlayers(conn)
 
     selected_player = None
@@ -1872,6 +1877,8 @@ def form(db_path, selector=None, window=20):
 
     rows = []
     for player, history in results.items():
+        if player not in eligible_players:
+            continue
         recent = history[-window:]
         if len(recent) < 3:
             continue
@@ -1901,7 +1908,7 @@ def form(db_path, selector=None, window=20):
     if not rows:
         return 'Non ci sono abbastanza frigo per calcolare la forma.'
 
-    message = '🔥 Forma sulle ultime <code>{}</code> frigo giocate (score quadratico)\n'.format(window)
+    message = '🔥 Forma ultime <code>{}</code> frigo giocate\n'.format(window)
     if selected_player:
         message += '<b>{}</b>\n'.format(html.escape(selected_player))
     for rank, (player, recent, wins, losses, score, delta) in enumerate(rows, 1):

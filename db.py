@@ -628,6 +628,13 @@ def getAllPlayers(conn):
     return p
 
 
+def getLatestFrigoNumbers(conn, limit=50):
+    '''Restituisce i numeri delle ultime frigo registrate, dalla piu' recente.'''
+    cur = conn.cursor()
+    cur.execute("SELECT progr FROM frigos ORDER BY progr DESC LIMIT ?", (limit,))
+    return {row[0] for row in cur.fetchall()}
+
+
 def getPlayerFormResults(conn):
     '''Restituisce per ogni partecipante la sequenza cronologica dei risultati
     (progr, vittoria), dove vittoria e' True se ha vinto quella frigo.'''
