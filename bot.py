@@ -13,6 +13,7 @@ from functools import partial
 import csv
 import html
 import os
+import re
 import time
 
 import db
@@ -89,9 +90,25 @@ async def troll_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raise ApplicationHandlerStop
 
 
+def is_f_message(text):
+    text = text.strip().lower()
+    if not text:
+        return False
+
+    # Clear refusals or postponements should not count as an eager F.
+    if re.search(r'\bbasta\b|\bf\+?\s+(?:tra|fra)\s+\d+\b|\bper i prossimi\b|\bultima volta che\b', text):
+        return False
+
+    if re.search(r'(?<!\w)f\+?(?!\w)', text):
+        return True
+
+    # A few common affirmative replies don't need to contain the letter F.
+    return bool(re.fullmatch(r'(?:(?:io)\s+)?ci sono[.!?]*|ultima(?:\s+dai)?[.!?]*', text))
+
+
 async def f_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
-    if chat.type not in ('group', 'supergroup'):
+    if chat.type not in ('group', 'supergroup') or not is_f_message(update.message.text or ''):
         return
 
     user = update.message.from_user
@@ -827,7 +844,11 @@ def start_bot(token, db_path):
                        partial(handle_message, path=db_path))
     m_new_season = MessageHandler(filters.TEXT & ~filters.COMMAND,
                                    partial(new_season_name_message, path=db_path))
-    m_f = MessageHandler(filters.Regex(r'(?i)^F$') & filters.ChatType.GROUPS, f_message)
+    m_f = MessageHandler(
+        filters.Regex(r'(?i)(?<!\w)f\+?(?!\w)|\bci\s+sono\b|\bultima\b')
+        & filters.ChatType.GROUPS,
+        f_message,
+    )
 
     c_week = CommandHandler("week", partial(week_command, path=db_path))
     c_animali = CommandHandler("animali", partial(animali_command, path=db_path))
