@@ -630,14 +630,13 @@ def getAllPlayers(conn):
 
 def getPokemonSpawnStatsByPlayer(conn, pokemon):
     '''Per ogni giocatore che ha spawnato `pokemon`, ritorna
-    (player, spawn, frigo_giocatore, frigo_con_spawn, frigo_totali).'''
+    (player, spawn, frigo_giocatore, frigo_con_spawn).'''
     cur = conn.cursor()
     cur.execute('''SELECT s.player, COUNT(*) AS spawn_count,
                           (SELECT COUNT(*) FROM frigos f
                            WHERE f.player1=s.player OR f.player2=s.player
                               OR f.player3=s.player OR f.player4=s.player) AS player_games,
-                          COUNT(DISTINCT s.frigo) AS games_with_spawn,
-                          (SELECT COUNT(*) FROM frigos) AS total_games
+                          COUNT(DISTINCT s.frigo) AS games_with_spawn
                    FROM spawns s
                    WHERE s.spawn=?
                    GROUP BY s.player''', (pokemon,))
@@ -646,7 +645,7 @@ def getPokemonSpawnStatsByPlayer(conn, pokemon):
 
 def getPlayerPokemonStats(conn, player, pokemon):
     '''Statistiche di una coppia player/pokemon: spawn, vittorie, wincon,
-    primo/ultimo spawn e link della sverginata se il player ha fatto la prima
+    primo/ultimo spawn e (progr, link) della sverginata se il player ha fatto la prima
     vittoria storica di quel pokemon. I frigo sono rappresentati come
     (progr, data).'''
     cur = conn.cursor()
@@ -672,11 +671,11 @@ def getPlayerPokemonStats(conn, player, pokemon):
         cur.execute("SELECT progr, data FROM frigos WHERE progr=?", (last_frigo,))
         last_spawn = cur.fetchone()
 
-    cur.execute('''SELECT winner, replay_link FROM frigos
+    cur.execute('''SELECT winner, progr, replay_link FROM frigos
                    WHERE pokewinner=? ORDER BY progr LIMIT 1''', (pokemon,))
     first_win = cur.fetchone()
     sverginata_replay = (
-        first_win[1] if first_win and first_win[0] == player else None
+        (first_win[1], first_win[2]) if first_win and first_win[0] == player else None
     )
     return spawn_count, wins_count, wincon_count or 0, games_played, first_spawn, last_spawn, sverginata_replay
 

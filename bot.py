@@ -437,14 +437,26 @@ async def animale_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
 
 
 async def spawn_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
-    animale = update.message.text.partition(' ')[2].strip()
+    arguments = update.message.text.partition(' ')[2].strip()
+    parts = arguments.rsplit(maxsplit=1)
+    min_games = 0
+    animale = arguments
+    if len(parts) == 2 and parts[1].isdigit():
+        animale, min_games = parts[0], int(parts[1])
+        if min_games < 1:
+            await update.message.reply_text(
+                'il minimo deve essere almeno 1: <code>/spawn animale [min_frigo]</code>',
+                parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+            )
+            return
     if not animale:
         await update.message.reply_text(
-            'e dammi un animale', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+            'e dammi un animale, eventualmente seguito dal numero minimo di frigo: <code>/spawn animale [min_frigo]</code>',
+            parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
         )
         return
 
-    message = worker.spawnRanking(animale, path)
+    message = worker.spawnRanking(animale, path, min_games)
     await update.message.reply_text(
         message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
@@ -626,7 +638,7 @@ COMMAND_SECTIONS = [
         ("animali2", "classifica animali per winrate"),
         ("animale &lt;nome&gt;", "statistiche su un animale"),
         ("coppia &lt;giocatore&gt;,&lt;pokemon&gt;", "statistiche di un giocatore con un animale"),
-        ("spawn &lt;animale&gt;", "top giocatori per spawn assoluti e percentuali di un animale"),
+        ("spawn &lt;animale&gt; [min_frigo]", "top giocatori per spawn assoluti e percentuali di un animale, filtrabili per frigo minime"),
         ("wincons", "animali più winconati"),
         ("cessi", "animali da sverginare"),
         ("desaparecidos", "animali che non spawnano da più tempo"),

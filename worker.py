@@ -116,7 +116,6 @@ def insertResult(db_path, sd_link):
 
     message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)
     for pid in list(players.keys()):
-        # message = message + '\n{} : {}'.format(players[pid]['id'], str(players[pid]['animali']).replace("'", ''))
         message = message + '\n· {}'.format(players[pid]['id'])
     message = message + '\n\n' + joks.messForWinnerOnReg(
         winner_name, poke_winner, seed=progr, cesso_sverginato=cesso_sverginato
@@ -259,7 +258,7 @@ def frigoInfoRandom(db_path):
     db.closeDbConn(conn)
 
     if not max_frigo:
-        return "Se magari mi dessi una frigo non inventata"
+        return "se magari mi dessi una frigo non inventata"
 
     return frigoInfo(random.randint(1, max_frigo), db_path)
 
@@ -270,7 +269,7 @@ def frigoInfoLast(db_path):
     db.closeDbConn(conn)
 
     if not max_frigo:
-        return "Se magari mi dessi una frigo non inventata"
+        return "se magari mi dessi una frigo non inventata"
 
     return frigoInfo(max_frigo, db_path)
 
@@ -404,7 +403,7 @@ def sisoDetails(db_path, selector):
         ordinal = int(selector)
         if ordinal < 1 or ordinal > len(seasons):
             db.closeDbConn(conn)
-            return None, 'La siso numero {} non esiste.'.format(ordinal)
+            return None, 'mai saputo di una siso numero {}'.format(ordinal)
         season = seasons[ordinal - 1]
     else:
         query = selector.casefold()
@@ -414,7 +413,7 @@ def sisoDetails(db_path, selector):
         )
         if difflib.SequenceMatcher(a=query, b=season[0].casefold()).ratio() < 0.5:
             db.closeDbConn(conn)
-            return None, 'Non trovo una siso che si chiami così.'
+            return None, 'inventati pure i nomi delle siso adesso'
         ordinal = seasons.index(season) + 1
 
     name, from_frigo, season_to, winner, startdate, enddate = season
@@ -1167,8 +1166,8 @@ def edginessRanking(db_path):
     return message
 
 
-def spawnRanking(animale, db_path):
-    '''Top 3 giocatori per numero di spawn e percentuale di spawn di un animale.'''
+def spawnRanking(animale, db_path, min_games=0):
+    '''Top 3 giocatori per numero di spawn e percentuale, con filtro opzionale sulle frigo giocate.'''
     conn = db.openDbConn(db_path)
     top_pokemon = None
     top_similarity = 0
@@ -1186,17 +1185,22 @@ def spawnRanking(animale, db_path):
 
     stats = db.getPokemonSpawnStatsByPlayer(conn, top_pokemon)
     db.closeDbConn(conn)
+    stats = [row for row in stats if row[2] >= min_games]
     if not stats:
+        if min_games:
+            return 'Nessun giocatore ha fatto almeno {} frigo.'.format(min_games)
         return 'Nessuno ha mai spawnato {}'.format(html.escape(top_pokemon))
 
-    total_games = stats[0][4]
     results = [
         (player, count, games_with_spawn, player_games,
-         games_with_spawn * 100 / total_games if total_games else 0)
-        for player, count, player_games, games_with_spawn, total_games in stats
+         games_with_spawn * 100 / player_games if player_games else 0)
+        for player, count, player_games, games_with_spawn in stats
     ]
-    message = '<b>Top spawn di {}</b>\n'.format(html.escape(top_pokemon))
-    total_spawns = sum(count for _, count, _, _, _ in stats)
+    message = '<b>Top spawn di {}</b>'.format(html.escape(top_pokemon))
+    if min_games:
+        message += ' (minimo {} frigo giocate dal player)'.format(min_games)
+    message += '\n'
+    total_spawns = sum(count for _, count, _, _ in stats)
     for title, sort_index in (('Numero assoluto ({})'.format(total_spawns), 1), ('Percentuale', 4)):
         ordered = sorted(results, key=lambda row: row[sort_index], reverse=True)
         message += '\n{}:\n'.format(title)
@@ -1210,7 +1214,7 @@ def spawnRanking(animale, db_path):
                 rank_label, html.escape(player),
                 '{} spawn'.format(count)
                 if sort_index == 1
-                else '{:.2f}% ({}/{})'.format(rate, games_with_spawn, total_games)
+                else '{:.2f}% ({}/{})'.format(rate, games_with_spawn, player_games)
             )
     return message.rstrip()
 
@@ -1276,7 +1280,13 @@ def coppia(player, pokemon, db_path):
         message += f'Mai spawnato con {player_name}'
 
     if replay:
-        message += '\n\n→ Sverginato: <a href="{}">replay</a>'.format(html.escape(replay, quote=True))
+        sverginata_frigo, sverginata_link = replay
+        if sverginata_link:
+            message += '\n\n→ Sverginato: <a href="{}">#{}</a>'.format(
+                html.escape(sverginata_link, quote=True), sverginata_frigo
+            )
+        else:
+            message += '\n\n→ Sverginato: <code>#{}</code>'.format(sverginata_frigo)
     return message
 
 
