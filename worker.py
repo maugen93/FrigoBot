@@ -83,26 +83,23 @@ def insertResult(db_path, sd_link):
     past_durations = db.getAllDurationsSeconds(c)
 
     # controllo nick registrati
-    for pid in list(players.keys()):
-        played_sd = players[pid]['collo']
-        player = db.getPlayerFromSDName(c, played_sd)
-
+    for pid, player_data in players.items():
+        player = db.getPlayerFromSDName(c, player_data['collo'])
         if not player:
             c.close()
-            return 'Collo {} non presente nel DB'.format(played_sd), None
-        players[pid]['id'] = player
+            return 'Ma chi cazzo è {}'.format(player_data['collo']), None
+        player_data['id'] = player
 
     progr = db.getNumberOfFrigos(c) + 1
     week = db.getActualWeek(c)
     # salvataggio spawns
     spawns_for_cache = []
-    for pid in list(players.keys()):
-        player = players[pid]['id']
-        ultimo_in_campo = players[pid]['ultimo_in_campo']
-        for an in players[pid]['animali']:
-            winconato = (an == ultimo_in_campo)
-            db.insertSpawn(c, progr, player, an, winconato=winconato)
-            spawns_for_cache.append((player, an, winconato))
+    for player_data in players.values():
+        player = player_data['id']
+        ultimo_in_campo = player_data['ultimo_in_campo']
+        for an in player_data['animali']:
+            spawns_for_cache.append((player, an, an == ultimo_in_campo))
+    db.insertSpawns(c, progr, spawns_for_cache)
 
     winner_name = db.getPlayerFromSDName(c, winner)
     cesso_sverginato = not db.hasPokemonEverWon(c, poke_winner)
@@ -115,8 +112,8 @@ def insertResult(db_path, sd_link):
     db.updateStatsCacheForFrigo(c, progr, week, participants, spawns_for_cache, winner_name, poke_winner)
 
     message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)
-    for pid in list(players.keys()):
-        message = message + '\n· {}'.format(players[pid]['id'])
+    for pid, player_data in players.items():
+        message += '\n· {}'.format(player_data['id'])
     message = message + '\n\n' + joks.messForWinnerOnReg(
         winner_name, poke_winner, seed=progr, cesso_sverginato=cesso_sverginato
     )

@@ -9,6 +9,7 @@ def openDbConn(dbpath):
     ensureFrigosSchema(conn)
     ensureSeasonDatesSchema(conn)
     ensureCommandLogSchema(conn)
+    conn.commit()
     return conn
 
 
@@ -23,16 +24,12 @@ def ensureFrigosSchema(conn):
     cols = [row[1] for row in conn.execute("PRAGMA table_info(frigos)")]
     if 'turns' not in cols:
         conn.execute("ALTER TABLE frigos ADD COLUMN turns INTEGER")
-        conn.commit()
     if 'start_time' not in cols:
         conn.execute("ALTER TABLE frigos ADD COLUMN start_time INTEGER")
-        conn.commit()
     if 'end_time' not in cols:
         conn.execute("ALTER TABLE frigos ADD COLUMN end_time INTEGER")
-        conn.commit()
     if 'duration' not in cols:
         conn.execute("ALTER TABLE frigos ADD COLUMN duration TEXT")
-        conn.commit()
 
 
 def closeDbConn(conn):
@@ -59,20 +56,20 @@ def ensureStatsCacheSchema(conn):
         wins INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (player, week)
     )''')
-    conn.commit()
 
 
 def ensureSeasonDatesSchema(conn):
     """Add calendar boundaries for seasons, preserving existing databases."""
     cols = [row[1] for row in conn.execute("PRAGMA table_info(stagioni)")]
+    migration_needed = 'startdate' not in cols or 'enddate' not in cols
     if 'startdate' not in cols:
         conn.execute("ALTER TABLE stagioni ADD COLUMN startdate TEXT")
     if 'enddate' not in cols:
         conn.execute("ALTER TABLE stagioni ADD COLUMN enddate TEXT")
-    conn.commit()
 
-    # Backfill known boundaries from the first/last recorded match of each
-    # already-existing season. New seasons store their planned dates directly.
+    # Backfill NULL legacy boundaries once when adding these columns.
+    if not migration_needed:
+        return
     conn.execute('''UPDATE stagioni SET startdate=(
         SELECT data FROM frigos WHERE progr=stagioni.from_frigo
     ) WHERE startdate IS NULL''')
@@ -93,7 +90,6 @@ def ensureSeasonDatesSchema(conn):
                          (end.strftime('%d/%m/%y'), stagione))
         except (TypeError, ValueError):
             pass
-    conn.commit()
 
 
 def ensureCommandLogSchema(conn):
@@ -106,7 +102,6 @@ def ensureCommandLogSchema(conn):
         command TEXT NOT NULL,
         in_group INTEGER NOT NULL
     )''')
-    conn.commit()
 
 
 def logCommand(conn, chat_id, command, in_group):
@@ -116,7 +111,8 @@ def logCommand(conn, chat_id, command, in_group):
     conn.commit()
 
 
-def updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner):
+def updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner,
+                             commit=True, known_first_wins=None):
     '''Aggiorna incrementalmente mon_first_win/player_cesso_stats/player_weekly_stats
     per una singola frigo appena inserita, cosi' svergiconverters/svergitryers/swingscore
     non devono piu' ricalcolarsi rileggendo tutta la storia a ogni chiamata.
@@ -131,10 +127,11 @@ def updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, po
     '''
     cur = conn.cursor()
 
+    if known_first_wins is None:
+        known_first_wins = {row[0] for row in cur.execute("SELECT mon FROM mon_first_win")}
     cessi_players = set()
     for player, mon, winconato in spawns:
-        cur.execute("SELECT 1 FROM mon_first_win WHERE mon=?", (mon,))
-        is_cesso = cur.fetchone() is None
+        is_cesso = mon not in known_first_wins
         if is_cesso:
             cessi_players.add(player)
 
@@ -156,10 +153,10 @@ def updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, po
                 cessi_spawnati = cessi_spawnati + 1
         ''', (player,))
 
-    cur.execute("SELECT 1 FROM mon_first_win WHERE mon=?", (pokewinner,))
-    if cur.fetchone() is None:
+    if pokewinner not in known_first_wins:
         cur.execute("INSERT INTO mon_first_win (mon, first_win_progr) VALUES (?, ?)",
                     (pokewinner, progr))
+        known_first_wins.add(pokewinner)
 
     for player in set(participants):
         vinta = 1 if player == winner else 0
@@ -171,7 +168,8 @@ def updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, po
                 wins = wins + excluded.wins
         ''', (player, week, vinta))
 
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def rebuildStatsCache(conn):
@@ -189,12 +187,15 @@ def rebuildStatsCache(conn):
     cur.execute('''SELECT progr, week, player1, player2, player3, player4, winner, pokewinner
         FROM frigos ORDER BY progr''')
     frigo_rows = cur.fetchall()
+    known_first_wins = set()
 
     for progr, week, p1, p2, p3, p4, winner, pokewinner in frigo_rows:
         participants = [p for p in (p1, p2, p3, p4) if p is not None]
         cur.execute("SELECT player, spawn, winconato FROM spawns WHERE frigo=?", (progr,))
         spawns = [(r[0], r[1], bool(r[2])) for r in cur.fetchall()]
-        updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner)
+        updateStatsCacheForFrigo(conn, progr, week, participants, spawns, winner, pokewinner,
+                                  commit=False, known_first_wins=known_first_wins)
+    conn.commit()
 
 
 def deleteFrigo(conn, progr):
@@ -214,6 +215,16 @@ def insertNewFrigo(conn, progr, week, data, p1, p2, p3, p4, w, pw, sd_link, turn
                  "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                  (progr, week, data, p1, p2, p3, p4,
                   w, pw, sd_link, turns, start_time, end_time, duration))
+    conn.commit()
+
+
+def insertSpawns(conn, f_nr, spawns):
+    """Insert a match's spawn rows together to avoid one commit per Pokémon."""
+    conn.executemany(
+        "INSERT INTO spawns (frigo, player, spawn, winconato) VALUES (?, ?, ?, ?)",
+        ((f_nr, player, spawn, int(winconato))
+         for player, spawn, winconato in spawns),
+    )
     conn.commit()
 
 

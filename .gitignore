@@ -9,3 +9,4 @@ frigo.db-wal
 frigo.db-shm
 frigo.db.bak*
 backfill_*
+*.png

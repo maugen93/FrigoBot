@@ -1,6 +1,7 @@
-import json
 import re
 import requests
+
+REPLAY_TIMEOUT_SECONDS = 15
 
 
 def get_clean_mon_name(mon_name):
@@ -45,11 +46,10 @@ def get_num_turns(log_rows):
     del log Showdown (N e' il numero del turno appena iniziato, quindi l'ultimo
     valore visto e' il totale di turni della partita). Torna 0 se non c'e'
     nessuna riga |turn| nel log.'''
-    num_turns = 0
-    for log_i in log_rows:
+    for log_i in reversed(log_rows):
         if log_i.startswith('|turn|'):
-            num_turns = int(log_i.split('|')[2])
-    return num_turns
+            return int(log_i.split('|', 2)[2])
+    return 0
 
 
 def get_first_last_timestamps(log_rows):
@@ -57,17 +57,20 @@ def get_first_last_timestamps(log_rows):
     (righe intervallate tra i messaggi chat, non una per messaggio). Il primo
     segna l'inizio della battaglia, l'ultimo la fine. Torna (None, None) se il
     log non ha nessuna riga |t:|.'''
-    timestamps = [int(log_i.split('|')[2]) for log_i in log_rows if log_i.startswith('|t:|')]
-    if not timestamps:
-        return None, None
-    return timestamps[0], timestamps[-1]
+    first = last = None
+    for log_i in log_rows:
+        if log_i.startswith('|t:|'):
+            timestamp = int(log_i.split('|', 2)[2])
+            if first is None:
+                first = timestamp
+            last = timestamp
+    return first, last
 
 
 def elab_sd_replay(link_replay):
-    data = json.loads(
-        requests.get(link_replay + ".json").content)
-
-    players = data['players']
+    response = requests.get(link_replay + ".json", timeout=REPLAY_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    data = response.json()
 
     players = {'p1': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
                'p2': {'collo': None, 'animali': [], 'ultimo_in_campo': None},
@@ -76,9 +79,9 @@ def elab_sd_replay(link_replay):
                }
 
     log_rows = data['log'].split('\n')
-    for i in range(len(log_rows)):
-
-        log_i = log_rows[i]
+    winner = None
+    winner_id = None
+    for log_i in log_rows:
 
         # individuazione collo (gestisce anche la sostituzione di un
         # giocatore a metà partita: |player|p1| svuota il nome quando il
