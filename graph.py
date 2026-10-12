@@ -40,9 +40,15 @@ def save_daily_hist(days, counts, path):
     max_label_height = max(max_count, 1)
     ax.set_ylim(-0.5, max_label_height + max(0.5, max_label_height * 0.12))
     ax.bar(range(len(days)), counts, color=colors, alpha=0.9)
-    ax.set_xticks(range(len(days)), labels)
+    # Label both alternating weekdays, anchored on today's weekday and three days later.
+    current_weekday = days[-1].weekday()
+    tick_positions = [
+        i for i, day in enumerate(days)
+        if day.weekday() in (current_weekday, (current_weekday + 3) % 7)
+    ]
+    ax.set_xticks(tick_positions, [labels[i] for i in tick_positions])
     weekday_ax = ax.secondary_xaxis('bottom')
-    weekday_ax.set_xticks(range(len(days)), weekday_labels)
+    weekday_ax.set_xticks(tick_positions, [weekday_labels[i] for i in tick_positions])
     weekday_ax.spines['bottom'].set_position(('outward', 31))
     weekday_ax.spines['bottom'].set_color(SISO_BASELINE)
     weekday_ax.tick_params(axis='x', colors=SISO_INK_MUTED, labelsize=7, length=0, pad=2)
