@@ -849,6 +849,15 @@ def getNumberOfFrigoPerWeek(conn):
     return w, f
 
 
+def getNumberOfFrigoPerDay(conn, start_date):
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT data, COUNT(*) FROM frigos WHERE data >= ? GROUP BY data",
+        (start_date.strftime('%d/%m/%y'),),
+    )
+    return cur.fetchall()
+
+
 def getWeekStartDates(conn):
     cur = conn.cursor()
     cur.execute('select week,startdate from weeks where startdate is not null')

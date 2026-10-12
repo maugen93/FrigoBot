@@ -1672,6 +1672,24 @@ def frigoFrequency(db_path, n_weeks=None):
     return save_path
 
 
+def frigoDailyFrequency(db_path, n_days=7):
+    today = datetime.now().date()
+    start_date = today - timedelta(days=n_days - 1)
+    conn = db.openDbConn(db_path)
+    rows = db.getNumberOfFrigoPerDay(conn, start_date)
+    db.closeDbConn(conn)
+
+    counts = {
+        datetime.strptime(day, '%d/%m/%y').date(): count
+        for day, count in rows
+    }
+    days = [start_date + timedelta(days=i) for i in range(n_days)]
+    values = [counts.get(day, 0) for day in days]
+    save_path = 'frequenza_giornaliera.png'
+    graph.save_daily_hist(days, values, save_path)
+    return save_path
+
+
 def closeWeek(db_path):
     conn = db.openDbConn(db_path)
     data_today = datetime.now().strftime('%d/%m/%y')

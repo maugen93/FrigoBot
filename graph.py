@@ -16,6 +16,23 @@ CUSTOM_FONT_NAME = fm.FontProperties(fname=FONT_PATH).get_name()
 plt.rcParams['font.family'] = CUSTOM_FONT_NAME
 
 
+def save_daily_hist(days, counts, path):
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=150)
+    fig.patch.set_facecolor(SISO_SURFACE)
+    ax.set_facecolor(SISO_SURFACE)
+    labels = [day.strftime('%d/%m') for day in days]
+    ax.bar(range(len(days)), counts, color=SISO_BASELINE, alpha=0.8)
+    ax.set_xticks(range(len(days)), labels)
+    ax.set_ylabel('Numero di frigo')
+    ax.set_title('Frigo giocate giorno per giorno')
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.grid(axis='y', alpha=0.25)
+    fig.autofmt_xdate(rotation=45)
+    fig.tight_layout()
+    fig.savefig(path, facecolor=fig.get_facecolor())
+    plt.close(fig)
+
+
 def save_hist(x, y, path, current_week=None, week_start_dates=None, week_durations=None,
               n_weeks=None):
     x_np = np.asarray(x, dtype=float)

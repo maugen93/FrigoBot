@@ -631,6 +631,27 @@ async def andazzo_command(update: Update, context: ContextTypes.DEFAULT_TYPE, pa
     return
 
 
+async def andazzino_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    n_days = 7
+    if context.args:
+        try:
+            n_days = int(context.args[0])
+            if not 2 < n_days <= 30 or len(context.args) > 1:
+                raise ValueError
+        except ValueError:
+            await update.message.reply_text(
+                'numero di giorni tra 3 e 30, senza fare il fenomeno',
+                reply_markup=ReplyKeyboardRemove(),
+            )
+            return
+
+    plot_path = worker.frigoDailyFrequency(path, n_days=n_days)
+    await update.message.reply_photo(
+        plot_path, caption=f'Frigo al giorno negli ultimi {n_days} giorni',
+        parse_mode='HTML', reply_markup=ReplyKeyboardRemove(),
+    )
+
+
 async def ladder_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
     await update.message.reply_text(
         'fottiti', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
@@ -676,6 +697,7 @@ COMMAND_SECTIONS = [
     ("🧊 Altro", [
         ("frigo &lt;numero&gt;", "dettagli di una frigo specifica"),
         ("andazzo [numero|all]", "grafico frigo giocate per settimana"),
+        ("andazzino [giorni]", "frigo giocate giorno per giorno (da 3 a 30 giorni, default 7)"),
         ("calc", "link al damage calc di Showdown"),
         ("ladder", "vedi tu"),
         ("comandi", "vedi questa lista tipo?"),
@@ -875,6 +897,7 @@ def start_bot(token, db_path):
     c_sec = CommandHandler("secchezza", partial(secchezza_command, path=db_path))
 
     c_and = CommandHandler("andazzo", partial(andazzo_command, path=db_path))
+    c_andazzino = CommandHandler("andazzino", partial(andazzino_command, path=db_path))
 
     c_lad = CommandHandler("ladder", partial(ladder_command, path=db_path))
 
@@ -938,6 +961,7 @@ def start_bot(token, db_path):
     application.add_handler(c_affettive)
     application.add_handler(c_sec)
     application.add_handler(c_and)
+    application.add_handler(c_andazzino)
     application.add_handler(c_lad)
     application.add_handler(c_cw)
     application.add_handler(c_cs)
