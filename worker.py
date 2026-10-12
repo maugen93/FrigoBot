@@ -1680,7 +1680,7 @@ def frigoDailyFrequency(db_path, n_days=7):
     db.closeDbConn(conn)
 
     counts = {
-        datetime.strptime(day, '%d/%m/%y').date(): count
+        datetime.strptime(day, '%Y-%m-%d').date(): count
         for day, count in rows
     }
     days = [start_date + timedelta(days=i) for i in range(n_days)]

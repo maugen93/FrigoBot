@@ -21,14 +21,49 @@ def save_daily_hist(days, counts, path):
     fig.patch.set_facecolor(SISO_SURFACE)
     ax.set_facecolor(SISO_SURFACE)
     labels = [day.strftime('%d/%m') for day in days]
-    ax.bar(range(len(days)), counts, color=SISO_BASELINE, alpha=0.8)
+    weekday_names = ('Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom')
+    weekday_labels = [
+        '{}{}'.format(weekday_names[day.weekday()], '*' if day.weekday() in (3, 6) else '')
+        for day in days
+    ]
+    max_count = max(counts, default=0)
+    min_count = min(counts, default=0)
+    max_days = [i for i, count in enumerate(counts) if count == max_count]
+    min_days = [i for i, count in enumerate(counts) if count == min_count]
+    colors = [SISO_BASELINE] * len(counts)
+    for i in max_days:
+        colors[i] = '#7d9f84'
+    for i in min_days:
+        colors[i] = '#d6a39a'
+    if max_count == min_count:
+        colors = ['#7d9f84'] * len(counts)
+    max_label_height = max(max_count, 1)
+    ax.set_ylim(-0.5, max_label_height + max(0.5, max_label_height * 0.12))
+    ax.bar(range(len(days)), counts, color=colors, alpha=0.9)
     ax.set_xticks(range(len(days)), labels)
+    weekday_ax = ax.secondary_xaxis('bottom')
+    weekday_ax.set_xticks(range(len(days)), weekday_labels)
+    weekday_ax.spines['bottom'].set_position(('outward', 31))
+    weekday_ax.spines['bottom'].set_color(SISO_BASELINE)
+    weekday_ax.tick_params(axis='x', colors=SISO_INK_MUTED, labelsize=7, length=0, pad=2)
+    for label in weekday_ax.get_xticklabels():
+        label.set_fontfamily(CUSTOM_FONT_NAME)
     ax.set_ylabel('Numero di frigo')
     ax.set_title('Frigo giocate giorno per giorno')
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     ax.grid(axis='y', alpha=0.25)
+    for i in max_days:
+        ax.annotate('MAX', (i, counts[i]), xytext=(0, 5), textcoords='offset points',
+                    ha='center', va='bottom', fontsize=7, color='#496d50',
+                    fontfamily=CUSTOM_FONT_NAME)
+    for i in min_days:
+        if min_count != max_count:
+            ax.annotate('MIN', (i, counts[i]), xytext=(0, -9), textcoords='offset points',
+                        ha='center', va='top', fontsize=7, color='#9b6258',
+                        fontfamily=CUSTOM_FONT_NAME)
     fig.autofmt_xdate(rotation=45)
     fig.tight_layout()
+    fig.subplots_adjust(bottom=0.23)
     fig.savefig(path, facecolor=fig.get_facecolor())
     plt.close(fig)
 
