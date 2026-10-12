@@ -851,16 +851,14 @@ def getNumberOfFrigoPerWeek(conn):
 
 def getNumberOfFrigoPerDay(conn, start_date):
     cur = conn.cursor()
-    # `frigos.data` is stored as DD/MM/YY, which cannot be compared
-    # chronologically as text (especially across month/year boundaries).
-    # Convert it to an ISO date for filtering and grouping.
     cur.execute(
         """
-        SELECT date(substr(data, 7, 2) || '-' || substr(data, 4, 2) || '-' ||
-                    substr(data, 1, 2), '+2000 years') AS day, COUNT(*)
+        SELECT '20' || substr(data, 7, 2) || '-' || substr(data, 4, 2) || '-' ||
+               substr(data, 1, 2) AS day, COUNT(*)
         FROM frigos
-        WHERE date(substr(data, 7, 2) || '-' || substr(data, 4, 2) || '-' ||
-                   substr(data, 1, 2), '+2000 years') >= ?
+        WHERE data GLOB '[0-3][0-9]/[0-1][0-9]/[0-9][0-9]'
+          AND '20' || substr(data, 7, 2) || '-' || substr(data, 4, 2) || '-' ||
+              substr(data, 1, 2) >= ?
         GROUP BY day
         """,
         (start_date.isoformat(),),
