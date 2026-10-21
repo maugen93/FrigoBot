@@ -65,8 +65,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
         )
     if leader_alert:
         await update.message.reply_text(leader_alert, parse_mode='HTML')
-    time.sleep(5)
-    await context.bot.send_message(update.message.chat_id, 'prossima')
     return
 
 

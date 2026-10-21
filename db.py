@@ -1131,6 +1131,13 @@ def getUnicumByPlayer(conn, player):
     return animali, wins
 
 
+def getPokemonWinningPlayers(conn, pokemon):
+    """Return distinct players who have won with this Pokémon as pokewinner."""
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT winner FROM frigos WHERE pokewinner=?", (pokemon,))
+    return [row[0] for row in cur.fetchall()]
+
+
 def UnicumLadder(conn):
     query = '''select * from (
     select winner,count(*)as c from (

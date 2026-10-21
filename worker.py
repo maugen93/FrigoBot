@@ -103,6 +103,12 @@ def insertResult(db_path, sd_link):
 
     winner_name = db.getPlayerFromSDName(c, winner)
     cesso_sverginato = not db.hasPokemonEverWon(c, poke_winner)
+    prior_pokemon_winners = db.getPokemonWinningPlayers(c, poke_winner)
+    stolen_unicum_owner = (
+        prior_pokemon_winners[0]
+        if len(prior_pokemon_winners) == 1 and prior_pokemon_winners[0] != winner_name
+        else None
+    )
     data = datetime.now().strftime('%d/%m/%y')
 
     # insert
@@ -114,8 +120,19 @@ def insertResult(db_path, sd_link):
     message = "Inserita Frigo Nr <code>{}</code>\n\nPartecipanti:".format(progr)
     for pid, player_data in players.items():
         message += '\n· {}'.format(player_data['id'])
-    message = message + '\n\n' + joks.messForWinnerOnReg(
-        winner_name, poke_winner, seed=progr, cesso_sverginato=cesso_sverginato
+    stolen_unicum_counts = None
+    if stolen_unicum_owner:
+        owner_unicums, _ = db.getUnicumByPlayer(c, stolen_unicum_owner)
+        winner_unicums, _ = db.getUnicumByPlayer(c, winner_name)
+        stolen_unicum_counts = (len(winner_unicums), len(owner_unicums))
+    message = message + '\n\n' + (
+        joks.messForStolenUnicumOnReg(
+            winner_name, poke_winner, stolen_unicum_owner, stolen_unicum_counts
+        )
+        if stolen_unicum_owner
+        else joks.messForWinnerOnReg(
+            winner_name, poke_winner, seed=progr, cesso_sverginato=cesso_sverginato
+        )
     )
 
     if duration_seconds is not None:
@@ -124,7 +141,7 @@ def insertResult(db_path, sd_link):
             message = message + '\n\n' + duration_alert
 
     leader_alert = _newSisoLeaderMessage(c, progr)
-
+    db.closeDbConn(c)
     return message, leader_alert
 
 

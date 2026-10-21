@@ -49,6 +49,16 @@ def messForWinnerOnReg(winner_name, pk_winner, seed=None, cesso_sverginato=False
         return rng.choice(defaults)
 
 
+def messForStolenUnicumOnReg(winner_name, pk_winner, owner_name, unicum_counts, seed=None):
+    winner_unicums, owner_unicums = unicum_counts
+    rng = random.Random(seed)
+    return rng.choice([
+        'Ecco {} (<code>{}</code>) che ruba {} a {} (<code>{}</code>), godo',
+        'Colpo basso di {} (<code>{}</code>): {} strappato a {} (<code>{}</code>)',
+        "Bravo {} (<code>{}</code>), togli la gioia dell'unicum {} a {} (<code>{}</code>)"
+    ]).format(winner_name, winner_unicums, pk_winner, owner_name, owner_unicums)
+
+
 def str_sverg(sverginatori):
     contatore = Counter(sverginatori)
 
