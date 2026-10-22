@@ -1869,16 +1869,33 @@ def SverginatiPlayer(player, db_path):
         return "non conosco questo {}".format(player)
 
     sverginati = db.getSverginatiByPlayer(conn, top_similar)
+    player_sverginati_count = len(sverginati)
+    sverginati_counts = [
+        len(db.getSverginatiByPlayer(conn, known_player)) for known_player in players
+    ]
+    sverginati_rank = _formatRank(
+        player_sverginati_count,
+        sverginati_counts
+    )
     unici, _ = db.getUnicumByPlayer(conn, top_similar)
     unici = set(unici)
+    ritenuti_percent = len(unici) * 100 / player_sverginati_count if player_sverginati_count else 0
+    ritenuti_percents = []
+    for known_player in players:
+        known_sverginati = db.getSverginatiByPlayer(conn, known_player)
+        known_unici, _ = db.getUnicumByPlayer(conn, known_player)
+        known_percent = len(set(known_unici)) * 100 / len(known_sverginati) if known_sverginati else 0
+        ritenuti_percents.append(known_percent)
+    ritenuti_rank = _formatRank(ritenuti_percent, ritenuti_percents)
     marker = "✡" if top_similar.lower() == "ilfato" else "✽"
     pokemon = ["{} {}".format(mon, marker) if mon in unici else mon for mon in sverginati]
 
     if not pokemon:
         message = "{} non ha sverginato nessun Pokémon".format(top_similar)
     else:
-        message = "Sverginati da {}: <code>{}</code>\n(dal più vecchio al più recente)\n\n{}".format(
-            top_similar, len(pokemon), ", ".join(html.escape(mon) for mon in pokemon)
+        message = "Sverginati da {}: <code>{}</code>{}\n(dal più vecchio al più recente)\n\n{}\n\nRitenuti: {:.1f}%{}".format(
+            top_similar, player_sverginati_count, sverginati_rank,
+            ", ".join(html.escape(mon) for mon in pokemon), ritenuti_percent, ritenuti_rank
         )
     db.closeDbConn(conn)
     return message
