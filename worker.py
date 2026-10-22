@@ -141,8 +141,27 @@ def insertResult(db_path, sd_link):
             message = message + '\n\n' + duration_alert
 
     leader_alert = _newSisoLeaderMessage(c, progr)
+    pokemon_recap = _pokemonWinRecap(c, poke_winner)
     db.closeDbConn(c)
-    return message, leader_alert
+    return message, leader_alert, pokemon_recap
+
+
+def _pokemonWinRecap(conn, pokemon):
+    """Riassume in ordine le vittorie di ogni giocatore con il Pokémon."""
+    first_winner, first_win_frigo = db.getFirstWinnerOfMon(conn, pokemon)
+    if first_win_frigo is None or first_win_frigo == db.getNumberOfFrigos(conn):
+        return None
+
+    winners, wins = db.getWinsPkmn(conn, pokemon)
+    if not wins:
+        return None
+
+    # A preformatted block keeps names and counts aligned, including long names.
+    name_width = max(len(winner) for winner in winners) + 1
+    lines = ["{}{} {:>{}}".format(
+        winner, "(*)" if winner == first_winner else "   ", count, name_width
+    ) for winner, count in zip(winners, wins)]
+    return "Hanno vinto con tale animale:\n<pre>{}</pre>".format("\n".join(lines))
 
 
 def _sisoLeader(conn, from_frigo, to_frigo):

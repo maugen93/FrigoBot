@@ -618,6 +618,7 @@ def getWinsPkmn(conn, pk):
             select * from (select pokewinner,winner, count(*) as c from frigos
             group by pokewinner,winner)t
             where pokewinner=?
+            order by c desc, winner asc
             '''
     cur.execute(query, (pk,))
     result = cur.fetchall()

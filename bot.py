@@ -58,11 +58,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, pat
     if user.username and user.username.lower() == TROLL_USERNAME:
         _troll_last_replay[user.id] = time.time()
 
-    message, leader_alert = worker.insertResult(path, update.message.text)
+    message, leader_alert, pokemon_recap = worker.insertResult(path, update.message.text)
     if message:
         await update.message.reply_text(
             message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
         )
+    if pokemon_recap:
+        await update.message.reply_text(pokemon_recap, parse_mode='HTML')
     if leader_alert:
         await update.message.reply_text(leader_alert, parse_mode='HTML')
     return
