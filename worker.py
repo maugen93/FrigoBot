@@ -1853,7 +1853,39 @@ def LadderUnici(db_path):
     return message
 
 
+def SverginatiPlayer(player, db_path):
+    conn = db.openDbConn(db_path)
+    players = db.getAllPlayers(conn)
+    top_similar = None
+    top_similitude = 0
+    for known_player in players:
+        ratio = difflib.SequenceMatcher(a=player.lower(), b=known_player.lower()).ratio()
+        if ratio > 0.7 and ratio > top_similitude:
+            top_similar = known_player
+            top_similitude = ratio
+
+    if not top_similar:
+        db.closeDbConn(conn)
+        return "non conosco questo {}".format(player)
+
+    sverginati = db.getSverginatiByPlayer(conn, top_similar)
+    unici, _ = db.getUnicumByPlayer(conn, top_similar)
+    unici = set(unici)
+    marker = "✡" if top_similar.lower() == "ilfato" else "✽"
+    pokemon = ["{} {}".format(mon, marker) if mon in unici else mon for mon in sverginati]
+
+    if not pokemon:
+        message = "{} non ha sverginato nessun Pokémon".format(top_similar)
+    else:
+        message = "Sverginati da {}: <code>{}</code>\n(dal più vecchio al più recente)\n\n{}".format(
+            top_similar, len(pokemon), ", ".join(html.escape(mon) for mon in pokemon)
+        )
+    db.closeDbConn(conn)
+    return message
+
+
 def UniciPlayer(player, db_path):
+    c = db.openDbConn(db_path)
     c = db.openDbConn(db_path)
     players = db.getAllPlayers(c)
     top_similar = None

@@ -682,6 +682,7 @@ COMMAND_SECTIONS = [
         ("desaparecidos", "animali che non spawnano da più tempo"),
         ("unicums", "classifica vittorie con animali unici"),
         ("unicum &lt;nome&gt;", "animali unici sverginati da un giocatore"),
+        ("sverginate &lt;nome&gt;", "animali sverginati da un giocatore"),
     ]),
     ("👤 Giocatori", [
         ("player &lt;nome&gt;", "scheda giocatore"),
@@ -729,6 +730,20 @@ async def unicum_ladder_command(update: Update, context: ContextTypes.DEFAULT_TY
         worker.LadderUnici(path), parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
     )
     return
+
+
+async def sverginate_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
+    command = update.message.text
+    if len(command.split()) > 1:
+        player = command.split(maxsplit=1)[1]
+        message = worker.SverginatiPlayer(player, path)
+        await update.message.reply_text(
+            message, parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
+    else:
+        await update.message.reply_text(
+            'e dimmi chi', parse_mode='HTML', reply_markup=ReplyKeyboardRemove()
+        )
 
 
 async def unicum_player_command(update: Update, context: ContextTypes.DEFAULT_TYPE, path):
@@ -916,6 +931,7 @@ def start_bot(token, db_path):
 
     c_uni_lad = CommandHandler("unicums", partial(unicum_ladder_command, path=db_path))
     c_uni_pl = CommandHandler("unicum", partial(unicum_player_command, path=db_path))
+    c_sverginate = CommandHandler("sverginate", partial(sverginate_player_command, path=db_path))
 
     c_cessi = CommandHandler("cessi", partial(cessi_list_command, path=db_path))
 
@@ -974,6 +990,7 @@ def start_bot(token, db_path):
     application.add_handler(c_comandi)
     application.add_handler(c_uni_lad)
     application.add_handler(c_uni_pl)
+    application.add_handler(c_sverginate)
     application.add_handler(c_cessi)
     application.add_handler(c_animali2)
     application.add_handler(c_desaparecidos)

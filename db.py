@@ -1112,6 +1112,23 @@ def getSpawnsWithWinsOfPokemon(conn, pokemon):
     return spawns_count, wins_count
 
 
+def getSverginatiByPlayer(conn, player):
+    """Pokémon vinti per la prima volta da questo giocatore, in ordine cronologico."""
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT f.pokewinner
+        FROM frigos f
+        WHERE f.winner = ?
+          AND f.progr = (
+              SELECT MIN(f2.progr)
+              FROM frigos f2
+              WHERE f2.pokewinner = f.pokewinner
+          )
+        ORDER BY f.progr
+    ''', (player,))
+    return [row[0] for row in cur.fetchall()]
+
+
 def getUnicumByPlayer(conn, player):
     query = ''' SELECT pokewinner,num_wins FROM (
             SELECT pokewinner, winner, COUNT(*) AS num_wins
