@@ -156,12 +156,20 @@ def _pokemonWinRecap(conn, pokemon):
     if not wins:
         return None
 
-    # A preformatted block keeps names and counts aligned, including long names.
-    name_width = max(len(winner) for winner in winners) + 1
-    lines = ["{}{} {:>{}}".format(
-        winner, "(*)" if winner == first_winner else "   ", count, name_width
-    ) for winner, count in zip(winners, wins)]
-    return "Hanno vinto con tale animale:\n<pre>{}</pre>".format("\n".join(lines))
+    # Match /frigo formatting: marker column, padded names and HTML <code>
+    # rows so Telegram's proportional font cannot break the alignment.
+    name_width = max(len(winner) + (4 if winner == first_winner else 0)
+                     for winner in winners)
+    count_width = max(len(str(count)) for count in wins)
+    lines = []
+    for winner, count in zip(winners, wins):
+        player_name = winner + " (*)" if winner == first_winner else winner
+        player_column = player_name.ljust(name_width)
+        count_column = str(count).rjust(count_width)
+        lines.append("<code>{} │  {}</code>".format(
+            html.escape(player_column), html.escape(count_column)
+        ))
+    return "Hanno vinto con tale animale:\n{}".format("\n".join(lines))
 
 
 def _sisoLeader(conn, from_frigo, to_frigo):
