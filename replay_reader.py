@@ -23,11 +23,13 @@ Violet|Polar|East|West|Hoenn|Sinnoh|Kalos|Kanto|Hangry|Teal|Combat|Three-Segment
     s = re.sub(r'\((.*%\|[a-z]{1,3})\)$', '', s)
     s = re.sub(r'\(fainted\)$', '', s)
     s = s.strip()
-    # Showdown identifies the teal-mask forme as either Ogerpon-Teal or
-    # Ogerpon (Ogerpon-Teal)/(Teal Mask). Normalize before the generic
-    # parenthesis cleanup below, which would otherwise discard the species.
+    # Normalize Ogerpon forms before generic parenthesis/forme cleanup. Replay
+    # logs may spell the base species, mask, or forme in several ways, including
+    # nested annotations such as "Ogerpon (Ogerpon-Teal)".
     if re.fullmatch(
-            r'ogerpon(?:[- ]teal(?:[- ]mask)?|\s*\((?:ogerpon[- ]?)?teal(?:[- ]mask)?\))',
+            r'ogerpon(?:[- ](?:teal|wellspring|hearthflame|cornerstone)(?:[- ]mask)?'
+            r'|\s*\((?:ogerpon[- ]?)?(?:teal|wellspring|hearthflame|cornerstone)'
+            r'(?:[- ]mask)?\))?',
             s, flags=re.IGNORECASE):
         return 'Ogerpon'
     match = re.search(r'\(([^)]+)\)', s)
